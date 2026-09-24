@@ -30,6 +30,8 @@ consensus result as `Accepted` and the GenVM execution result as `SUCCESS`:
 22. [Finalize the non-targeted praise case as allowed](https://explorer-studio.genlayer.com/tx/0x9e0b873db0e400efda59d4079b092c3fa96613fc58058756f73552a38029d07f)
 23. [Open the targeted-insult case](https://explorer-studio.genlayer.com/tx/0xaa8416f3e6ab15efb3bdfb239c84cbc4e58526e64a6477b20f876f01955867f9)
 24. [Finalize the targeted-insult case as a violation](https://explorer-studio.genlayer.com/tx/0xacc4df48fcd4bd20a0d531a555b6e2e93338d90a89ded945b6279f00ab2c2a58)
+25. [Open the member-reported reply-context case](https://explorer-studio.genlayer.com/tx/0x71232b8447b3f12f1d3c98c5a0c80b9bc1991c0b6979368510563be39894a248)
+26. [Finalize the member-reported reply-context case as allowed](https://explorer-studio.genlayer.com/tx/0x28dd6e26d304fbfdc850a1f686c2c04f15e093e212c4bedbe2a57c96abbf4edf)
 
 The original demo-guild readback contains three active rules and one decided case.
 That case is pinned to `no-targeted-abuse` version 1, includes the author's defence,
@@ -76,6 +78,28 @@ live Discord guild and its live contextual case are documented below.
 - The current member UX is report-driven: reply with `@CommonGround report`, use
   `/report` with a message link, or choose `Report to CommonGround`. The bot
   selects the rule; ordinary unreported messages are ignored.
+
+### Live member-report and reply-context test
+
+- A parent message, `Live context test: I finally shipped the feature.`, was
+  posted, followed by the reply `Fuck, this is so great!`.
+- The reply remained visible with no CommonGround response during the
+  unreported observation period, confirming that ordinary messages are not
+  reviewed automatically.
+- A server member then replied to that exact message with
+  `@Common ground report`. The bot checked seven active rules and selected
+  `Context-aware profanity` without asking the member for a rule ID.
+- The finalized `open_case` calldata contains the exact reported message and
+  `replied-to [reported-author]: Live context test: I finally shipped the feature.`
+  The reporting command itself is absent from the submitted context.
+- GenLayer finalized the case as `allowed`: the validators interpreted the
+  profanity as non-targeted emphasis/praise rather than an attack. The source
+  message remained visible and the bot posted the decision and explanation in
+  Discord.
+- Open transaction:
+  [`0x71232b8447b3f12f1d3c98c5a0c80b9bc1991c0b6979368510563be39894a248`](https://explorer-studio.genlayer.com/tx/0x71232b8447b3f12f1d3c98c5a0c80b9bc1991c0b6979368510563be39894a248)
+- Adjudication transaction:
+  [`0x28dd6e26d304fbfdc850a1f686c2c04f15e093e212c4bedbe2a57c96abbf4edf`](https://explorer-studio.genlayer.com/tx/0x28dd6e26d304fbfdc850a1f686c2c04f15e093e212c4bedbe2a57c96abbf4edf)
 
 ## Reproducible verification
 

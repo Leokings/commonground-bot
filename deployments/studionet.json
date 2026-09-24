@@ -47,6 +47,16 @@
         "action": "delete_and_warn",
         "open_transaction": "0xaa8416f3e6ab15efb3bdfb239c84cbc4e58526e64a6477b20f876f01955867f9",
         "adjudicate_transaction": "0xacc4df48fcd4bd20a0d531a555b6e2e93338d90a89ded945b6279f00ab2c2a58"
+      },
+      "member_report_with_reply_context": {
+        "case_id": "case-1552776079679295602-no-profanity",
+        "decision": "allowed",
+        "unreported_behavior": "ignored",
+        "auto_selected_rule": "no-profanity",
+        "message": "Fuck, this is so great!",
+        "reply_parent": "Live context test: I finally shipped the feature.",
+        "open_transaction": "0x71232b8447b3f12f1d3c98c5a0c80b9bc1991c0b6979368510563be39894a248",
+        "adjudicate_transaction": "0x28dd6e26d304fbfdc850a1f686c2c04f15e093e212c4bedbe2a57c96abbf4edf"
       }
     }
   }
