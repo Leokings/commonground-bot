@@ -27,6 +27,31 @@ describe("bot configuration", () => {
     expect(config.port).toBe(3000);
   });
 
+  it("uses the Northflank PostgreSQL connection variable", () => {
+    const config = loadConfig({
+      ...validEnvironment,
+      DATABASE_URL: "",
+      POSTGRES_URI: "postgresql://bot:secret@database.internal:5432/app",
+    });
+
+    expect(config.databaseUrl).toBe(
+      "postgresql://bot:secret@database.internal:5432/app",
+    );
+  });
+
+  it("uses Northflank's linked-addon alias", () => {
+    const config = loadConfig({
+      ...validEnvironment,
+      DATABASE_URL: "",
+      NF_COMMONGROUND_DB_POSTGRES_URI:
+        "postgresql://bot:secret@northflank.internal:5432/app",
+    });
+
+    expect(config.databaseUrl).toBe(
+      "postgresql://bot:secret@northflank.internal:5432/app",
+    );
+  });
+
   it("rejects malformed private keys", () => {
     expect(() =>
       loadConfig({ ...validEnvironment, GENLAYER_PRIVATE_KEY: "not-a-key" }),

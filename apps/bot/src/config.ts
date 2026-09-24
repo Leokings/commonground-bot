@@ -31,6 +31,8 @@ const configSchema = z.object({
     .default("false")
     .transform((value) => value === "true"),
   DATABASE_URL: optionalUrl,
+  POSTGRES_URI: optionalUrl,
+  NF_COMMONGROUND_DB_POSTGRES_URI: optionalUrl,
   PORT: z.coerce.number().int().min(1).max(65_535).default(8_080),
 });
 
@@ -73,7 +75,10 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env) {
     genlayerContractAddress: parsed.GENLAYER_CONTRACT_ADDRESS as `0x${string}`,
     genlayerRpcUrl: parsed.GENLAYER_RPC_URL,
     autoSubmitHybrid: parsed.AUTO_SUBMIT_HYBRID,
-    databaseUrl: parsed.DATABASE_URL,
+    databaseUrl:
+      parsed.DATABASE_URL ??
+      parsed.POSTGRES_URI ??
+      parsed.NF_COMMONGROUND_DB_POSTGRES_URI,
     port: parsed.PORT,
   };
 }
