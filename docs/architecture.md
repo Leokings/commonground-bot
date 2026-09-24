@@ -29,18 +29,31 @@ thresholds are deterministic and remain in the local rule engine.
    `LATEST_FINAL` rule cache.
 6. For every opted-in public message, the local rule engine evaluates automatic
    detectors.
-7. A moderator can right-click a message and choose `Check Rule` for a
+7. Hybrid rules use local detection only as candidate triage. A match never
+   proves a contextual violation; when automatic hybrid submission is enabled,
+   the exact message, bounded context, pinned rule, and exceptions go to
+   GenLayer.
+8. A moderator can right-click a message and choose `Check Rule` for a
    contextual rule.
-8. The backend opens a case using the exact active rule version, message hash,
+9. The backend opens a case using the exact active rule version, message hash,
    bounded context, and challenge reason.
-9. After an optional defence window, the worker calls `adjudicate_case`.
-10. Validators independently return `allowed`, `violation`, or
+10. After an optional defence window, the worker calls `adjudicate_case`.
+11. Validators independently return `allowed`, `violation`, or
     `needs_context`. Only that enum is authoritative; free-form analysis is
     explicitly non-authoritative.
-11. After successful finalization, the bot performs the rule's predetermined
+12. After successful finalization, the bot performs the rule's predetermined
     Discord action and posts an audit record.
-12. One appeal can trigger a fresh adjudication while preserving the original
+13. One appeal can trigger a fresh adjudication while preserving the original
     ruling.
+
+## Default-rule lifecycle
+
+`/rule setup` registers a new server and then installs the starter pack one
+finalized transaction at a time. `/rule install-defaults` repairs a partial
+installation without changing customized rules. Supplying
+`replace-existing:true` intentionally creates new versions from the latest
+pack. `/rule edit-rule` uses the same contract `update_rule` method for custom
+changes, so old versions and cases pinned to them remain auditable.
 
 ## Privacy boundary
 

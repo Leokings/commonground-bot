@@ -3,6 +3,7 @@ import { Pool } from "pg";
 export type OperationKind =
   | "register_guild"
   | "add_rule"
+  | "update_rule"
   | "disable_rule"
   | "open_case"
   | "adjudicate_case"

@@ -1,9 +1,11 @@
 import {
   ActivityTracker,
+  DEFAULT_RULES,
   evaluateRules,
   hashDiscordIdentifier,
   hashMessageSnapshot,
   type ConstitutionRule,
+  type EditableRuleInput,
   type MessageSample,
 } from "@commonground/core";
 import type { Client, Message } from "discord.js";
@@ -18,6 +20,13 @@ import type {
   StoredOperation,
 } from "./operation-store.js";
 import { RuleCache } from "./rule-cache.js";
+
+export interface DefaultRuleInstallResult {
+  added: string[];
+  updated: string[];
+  skipped: string[];
+  transactionHashes: string[];
+}
 
 export class ModerationService {
   readonly #activity = new ActivityTracker();
@@ -84,21 +93,23 @@ export class ModerationService {
     return hash;
   }
 
-  async addRule(
+  async setupGuildWithDefaults(
     guildId: string,
-    input: {
-      ruleId: string;
-      name: string;
-      text: string;
-      mode: "automatic" | "contextual" | "hybrid";
-      detectorJson: string;
-      exceptionsJson: string;
-      scopeJson: string;
-      action: string;
-      appealAllowed: boolean;
-    },
-  ): Promise<string> {
-    const hash = await this.submitWrite("add_rule", guildId, "add_rule", [
+    displayName: string,
+  ): Promise<{ registrationHash: string; defaults: DefaultRuleInstallResult }> {
+    const registrationHash = await this.submitWrite(
+      "register_guild",
+      guildId,
+      "register_guild",
+      [this.guildKey(guildId), displayName],
+    );
+    await this.finalize(registrationHash);
+    const defaults = await this.installDefaultRules(guildId, false);
+    return { registrationHash, defaults };
+  }
+
+  private ruleArguments(guildId: string, input: EditableRuleInput) {
+    return [
       this.guildKey(guildId),
       input.ruleId,
       input.name,
@@ -109,11 +120,73 @@ export class ModerationService {
       input.scopeJson,
       input.action,
       input.appealAllowed,
-    ]);
+    ] as Parameters<ContractGateway["write"]>[1];
+  }
+
+  async addRule(
+    guildId: string,
+    input: EditableRuleInput,
+  ): Promise<string> {
+    const hash = await this.submitWrite(
+      "add_rule",
+      guildId,
+      "add_rule",
+      this.ruleArguments(guildId, input),
+    );
     void this.finalize(hash)
       .then(() => this.#cache.invalidate(this.guildKey(guildId)))
       .catch((error) => logger.error({ error, hash }, "rule creation failed"));
     return hash;
+  }
+
+  async updateRule(guildId: string, input: EditableRuleInput): Promise<string> {
+    const hash = await this.submitWrite(
+      "update_rule",
+      guildId,
+      "update_rule",
+      this.ruleArguments(guildId, input),
+    );
+    void this.finalize(hash)
+      .then(() => this.#cache.invalidate(this.guildKey(guildId)))
+      .catch((error) => logger.error({ error, hash }, "rule update failed"));
+    return hash;
+  }
+
+  async installDefaultRules(
+    guildId: string,
+    replaceExisting: boolean,
+  ): Promise<DefaultRuleInstallResult> {
+    const current = await this.gateway.listRules(this.guildKey(guildId));
+    const byId = new Map(current.map((rule) => [rule.rule_id, rule]));
+    const result: DefaultRuleInstallResult = {
+      added: [],
+      updated: [],
+      skipped: [],
+      transactionHashes: [],
+    };
+
+    for (const rule of DEFAULT_RULES) {
+      const existing = byId.get(rule.ruleId);
+      if (existing && !replaceExisting) {
+        result.skipped.push(rule.ruleId);
+        continue;
+      }
+      const functionName = existing ? "update_rule" : "add_rule";
+      const kind = existing ? "update_rule" : "add_rule";
+      const hash = await this.submitWrite(
+        kind,
+        guildId,
+        functionName,
+        this.ruleArguments(guildId, rule),
+      );
+      result.transactionHashes.push(hash);
+      await this.finalize(hash);
+      if (existing) result.updated.push(rule.ruleId);
+      else result.added.push(rule.ruleId);
+    }
+
+    this.#cache.invalidate(this.guildKey(guildId));
+    return result;
   }
 
   async disableRule(guildId: string, ruleId: string): Promise<string> {
@@ -341,6 +414,7 @@ export class ModerationService {
           );
         } else if (
           operation.kind === "add_rule" ||
+          operation.kind === "update_rule" ||
           operation.kind === "disable_rule"
         ) {
           this.#cache.invalidate(this.guildKey(operation.guildId));

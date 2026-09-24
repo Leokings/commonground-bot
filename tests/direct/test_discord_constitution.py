@@ -47,16 +47,25 @@ def add_contextual_rule(contract, direct_vm, owner, *, rule_id="respect"):
     )
 
 
-def open_case(contract, direct_vm, owner, *, case_id="case-001"):
+def open_case(
+    contract,
+    direct_vm,
+    owner,
+    *,
+    case_id="case-001",
+    message_text="Nobody here wants you. You should disappear.",
+    context="The author repeated this statement after the recipient asked them to stop.",
+    challenge_reason="The message appears intended to drive another member away.",
+):
     direct_vm.sender = owner
     return contract.open_case(
         case_id,
         GUILD_KEY,
         "respect",
         "sha256:message-001",
-        "Nobody here wants you. You should disappear.",
-        "The author repeated this statement after the recipient asked them to stop.",
-        "The message appears intended to drive another member away.",
+        message_text,
+        context,
+        challenge_reason,
     )
 
 
@@ -283,6 +292,66 @@ def test_one_appeal_preserves_history(
 
     with direct_vm.expect_revert("Only a decided case can be appealed"):
         contract.appeal_case("case-001", "Try again")
+
+
+def test_same_profanity_can_be_allowed_or_violate_based_on_context(
+    direct_vm, direct_deploy, direct_alice
+):
+    contract = deploy(direct_vm, direct_deploy, direct_alice)
+    register(contract, direct_vm, direct_alice)
+    add_contextual_rule(contract, direct_vm, direct_alice)
+
+    open_case(
+        contract,
+        direct_vm,
+        direct_alice,
+        case_id="case-positive",
+        message_text="Fuck, this is so great!",
+        context="The member is celebrating another member's successful launch.",
+        challenge_reason="A profanity candidate was detected.",
+    )
+    direct_vm.mock_llm(
+        r"(?s).*Fuck, this is so great.*",
+        json.dumps(
+            {
+                "decision": "allowed",
+                "analysis": "The profanity is non-targeted praise, an explicit exception.",
+            }
+        ),
+    )
+    direct_vm.sender = direct_alice
+    positive = contract.adjudicate_case("case-positive")
+    assert positive["decision"] == "allowed"
+
+    direct_vm.clear_mocks()
+    open_case(
+        contract,
+        direct_vm,
+        direct_alice,
+        case_id="case-insult",
+        message_text="You are fucking stupid.",
+        context="The message directly replies to another member during an argument.",
+        challenge_reason="A profanity candidate was detected.",
+    )
+    direct_vm.mock_llm(
+        r"(?s).*You are fucking stupid.*",
+        json.dumps(
+            {
+                "decision": "violation",
+                "analysis": "The profanity forms a direct demeaning personal attack.",
+            }
+        ),
+    )
+    direct_vm.sender = direct_alice
+    insult = contract.adjudicate_case("case-insult")
+    assert insult["decision"] == "violation"
+
+    assert contract.get_case("case-positive")["message_text"] == (
+        "Fuck, this is so great!"
+    )
+    assert contract.get_case("case-insult")["message_text"] == (
+        "You are fucking stupid."
+    )
 
 
 def test_duplicate_case_id_is_rejected(

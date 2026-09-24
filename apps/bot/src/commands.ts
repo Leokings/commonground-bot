@@ -14,6 +14,7 @@ import {
   type MessageContextMenuCommandInteraction,
   type ModalSubmitInteraction,
 } from "discord.js";
+import type { EditableRuleInput } from "@commonground/core";
 
 import type { ModerationService } from "./moderation-service.js";
 
@@ -28,13 +29,23 @@ export const commandDefinitions = [
     .addSubcommand((command) =>
       command
         .setName("setup")
-        .setDescription("Register this Discord server")
+        .setDescription("Register this server and install the starter rule pack")
         .addStringOption((option) =>
           option
             .setName("display-name")
             .setDescription("Public name stored with the rule set")
             .setRequired(true)
             .setMaxLength(120),
+        ),
+    )
+    .addSubcommand((command) =>
+      command
+        .setName("install-defaults")
+        .setDescription("Install missing starter rules or restore their latest versions")
+        .addBooleanOption((option) =>
+          option
+            .setName("replace-existing")
+            .setDescription("Create new versions for starter rules that already exist"),
         ),
     )
     .addSubcommand((command) =>
@@ -52,6 +63,48 @@ export const commandDefinitions = [
           option
             .setName("mode")
             .setDescription("How the rule is enforced")
+            .setRequired(true)
+            .addChoices(
+              { name: "Automatic", value: "automatic" },
+              { name: "Contextual", value: "contextual" },
+              { name: "Hybrid", value: "hybrid" },
+            ),
+        )
+        .addStringOption((option) =>
+          option
+            .setName("action")
+            .setDescription("Predetermined consequence for a violation")
+            .setRequired(true)
+            .addChoices(
+              { name: "Warn", value: "warn" },
+              { name: "Delete", value: "delete" },
+              { name: "Delete and warn", value: "delete_and_warn" },
+              { name: "Delete and strike", value: "delete_and_strike" },
+              { name: "Log only", value: "log_only" },
+            ),
+        )
+        .addBooleanOption((option) =>
+          option
+            .setName("appeal")
+            .setDescription("Whether one appeal is allowed")
+            .setRequired(true),
+        ),
+    )
+    .addSubcommand((command) =>
+      command
+        .setName("edit-rule")
+        .setDescription("Create a new version of an existing server rule")
+        .addStringOption((option) =>
+          option
+            .setName("rule-id")
+            .setDescription("Stable identifier of the rule to update")
+            .setRequired(true)
+            .setMaxLength(48),
+        )
+        .addStringOption((option) =>
+          option
+            .setName("mode")
+            .setDescription("How the new rule version is enforced")
             .setRequired(true)
             .addChoices(
               { name: "Automatic", value: "automatic" },
@@ -124,14 +177,17 @@ export const commandDefinitions = [
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 ].map((command) => command.toJSON());
 
-function addRuleModal(interaction: ChatInputCommandInteraction): ModalBuilder {
+function ruleModal(
+  interaction: ChatInputCommandInteraction,
+  intent: "add-rule" | "edit-rule",
+): ModalBuilder {
   const ruleId = interaction.options.getString("rule-id", true);
   const mode = interaction.options.getString("mode", true);
   const action = interaction.options.getString("action", true);
   const appeal = interaction.options.getBoolean("appeal", true) ? "1" : "0";
   const modal = new ModalBuilder()
-    .setCustomId(`add-rule:${ruleId}:${mode}:${action}:${appeal}`)
-    .setTitle("Add server rule");
+    .setCustomId(`${intent}:${ruleId}:${mode}:${action}:${appeal}`)
+    .setTitle(intent === "add-rule" ? "Add server rule" : "Create new rule version");
   modal.addComponents(
     new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder()
@@ -180,6 +236,42 @@ function addRuleModal(interaction: ChatInputCommandInteraction): ModalBuilder {
   return modal;
 }
 
+function parseRuleMode(value: string): EditableRuleInput["mode"] {
+  if (value === "automatic" || value === "contextual" || value === "hybrid") {
+    return value;
+  }
+  throw new Error("Invalid rule mode");
+}
+
+function parseRuleAction(value: string): EditableRuleInput["action"] {
+  if (
+    value === "warn" ||
+    value === "delete" ||
+    value === "delete_and_warn" ||
+    value === "delete_and_strike" ||
+    value === "log_only"
+  ) {
+    return value;
+  }
+  throw new Error("Invalid rule action");
+}
+
+function installSummary(
+  result: Awaited<ReturnType<ModerationService["installDefaultRules"]>>,
+): string {
+  const lines = [
+    `Added: ${result.added.length ? result.added.map((id) => `\`${id}\``).join(", ") : "none"}`,
+    `Updated: ${result.updated.length ? result.updated.map((id) => `\`${id}\``).join(", ") : "none"}`,
+    `Unchanged: ${result.skipped.length ? result.skipped.map((id) => `\`${id}\``).join(", ") : "none"}`,
+  ];
+  if (result.transactionHashes.length) {
+    lines.push(
+      `Transactions:\n${result.transactionHashes.map((hash) => `• \`${hash}\``).join("\n")}`,
+    );
+  }
+  return lines.join("\n").slice(0, 2_000);
+}
+
 function challengeModal(
   interaction: MessageContextMenuCommandInteraction,
 ): ModalBuilder {
@@ -214,15 +306,28 @@ async function handleRuleCommand(
 ): Promise<void> {
   if (!interaction.guildId) throw new Error("Rule commands require a server");
   const subcommand = interaction.options.getSubcommand();
-  if (subcommand === "add-rule") {
-    await interaction.showModal(addRuleModal(interaction));
+  if (subcommand === "add-rule" || subcommand === "edit-rule") {
+    await interaction.showModal(ruleModal(interaction, subcommand));
     return;
   }
   await interaction.deferReply({ flags: EPHEMERAL });
   if (subcommand === "setup") {
     const displayName = interaction.options.getString("display-name", true);
-    const hash = await service.registerGuild(interaction.guildId, displayName);
-    await interaction.editReply(`Guild registration submitted: \`${hash}\``);
+    const result = await service.setupGuildWithDefaults(interaction.guildId, displayName);
+    await interaction.editReply(
+      `Server registration finalized: \`${result.registrationHash}\`\n${installSummary(result.defaults)}`.slice(
+        0,
+        2_000,
+      ),
+    );
+    return;
+  }
+  if (subcommand === "install-defaults") {
+    const result = await service.installDefaultRules(
+      interaction.guildId,
+      interaction.options.getBoolean("replace-existing") ?? false,
+    );
+    await interaction.editReply(installSummary(result));
     return;
   }
   if (subcommand === "list") {
@@ -274,25 +379,30 @@ async function handleModal(
 ): Promise<void> {
   if (!interaction.guildId) throw new Error("This action requires a server");
   const parts = interaction.customId.split(":");
-  if (parts[0] === "add-rule") {
+  if (parts[0] === "add-rule" || parts[0] === "edit-rule") {
     const [, ruleId, mode, action, appeal] = parts;
     if (!ruleId || !mode || !action || !appeal) throw new Error("Invalid rule form");
-    if (mode !== "automatic" && mode !== "contextual" && mode !== "hybrid") {
-      throw new Error("Invalid rule mode");
-    }
+    const parsedMode = parseRuleMode(mode);
+    const parsedAction = parseRuleAction(action);
     await interaction.deferReply({ flags: EPHEMERAL });
-    const hash = await service.addRule(interaction.guildId, {
+    const input: EditableRuleInput = {
       ruleId,
-      mode,
-      action,
+      mode: parsedMode,
+      action: parsedAction,
       appealAllowed: appeal === "1",
       name: interaction.fields.getTextInputValue("name"),
       text: interaction.fields.getTextInputValue("text"),
       detectorJson: interaction.fields.getTextInputValue("detector"),
       exceptionsJson: interaction.fields.getTextInputValue("exceptions"),
       scopeJson: interaction.fields.getTextInputValue("scope"),
-    });
-    await interaction.editReply(`Rule creation submitted: \`${hash}\``);
+    };
+    const hash =
+      parts[0] === "add-rule"
+        ? await service.addRule(interaction.guildId, input)
+        : await service.updateRule(interaction.guildId, input);
+    await interaction.editReply(
+      `Rule ${parts[0] === "add-rule" ? "creation" : "update"} submitted: \`${hash}\``,
+    );
     return;
   }
   if (parts[0] === "challenge") {

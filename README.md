@@ -10,6 +10,8 @@ The first working milestone now includes:
 
 - versioned, on-chain server rules;
 - Discord slash commands for rule administration;
+- a six-rule editable starter pack installed during server setup;
+- context-aware profanity triage that distinguishes emphasis from targeted abuse;
 - a message-context command for opening moderation cases;
 - deterministic local moderation;
 - GenLayer-backed contextual adjudication and one appeal;
@@ -66,9 +68,15 @@ a Docker deployment, and optional PostgreSQL-backed restart recovery. See
 
 ## Discord commands
 
-- `/rule setup` registers the server with the GenLayer contract.
+- `/rule setup` registers the server and installs the editable starter rules.
+- `/rule install-defaults` installs missing defaults; `replace-existing:true`
+  creates new on-chain versions of existing starter rules.
 - `/rule add-rule` creates a versioned rule.
+- `/rule edit-rule` creates a new version of an existing rule.
 - `/rule list` reads the finalized active rules.
 - `/rule disable-rule` disables an active rule.
 - `/case status` and `/case appeal` manage moderation cases.
 - `Apps → Check Rule` opens a contextual review from a Discord message.
+
+The starter pack and its context examples are documented in
+[`docs/default-rule-pack.md`](docs/default-rule-pack.md).

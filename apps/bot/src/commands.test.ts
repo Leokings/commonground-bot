@@ -15,7 +15,14 @@ describe("Discord command definitions", () => {
     const rule = commandDefinitions[0];
     expect(rule?.default_member_permissions).toBeDefined();
     const subcommands = rule?.options?.map((option) => option.name);
-    expect(subcommands).toEqual(["setup", "add-rule", "list", "disable-rule"]);
+    expect(subcommands).toEqual([
+      "setup",
+      "install-defaults",
+      "add-rule",
+      "edit-rule",
+      "list",
+      "disable-rule",
+    ]);
   });
 
   it("does not expose the retired constitution command", () => {
