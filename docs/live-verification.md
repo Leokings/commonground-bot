@@ -3,7 +3,8 @@
 CommonGround is deployed to the GenLayer Studio Network at
 [`0xf8145e93E2Ab9Ea40bA39707A6Ae4b1663a88A90`](https://explorer-studio.genlayer.com/address/0xf8145e93E2Ab9Ea40bA39707A6Ae4b1663a88A90).
 
-Every transaction below reached `FINALIZED` with `MAJORITY_AGREE`:
+Every transaction below reached `FINALIZED`; the current explorer displays the
+consensus result as `Accepted` and the GenVM execution result as `SUCCESS`:
 
 1. [Deploy the Intelligent Contract](https://explorer-studio.genlayer.com/tx/0xef16c8551190023d6bf9427333901cbb3d1ec680a4a470969beb6ec7b3ffcc6b)
 2. [Register the demo Discord guild](https://explorer-studio.genlayer.com/tx/0x5dfff3f50ce4193cf41aa769a3089155df72b994f60ef9e318c99930f567591e)
@@ -19,6 +20,16 @@ Every transaction below reached `FINALIZED` with `MAJORITY_AGREE`:
 12. [Add the live server's targeted-abuse hybrid rule](https://explorer-studio.genlayer.com/tx/0x3e9dc25b9d0035c8bfde7db2321cce7bf42c6637f1d9c0286117bcd36cf8d86f)
 13. [Open the live Discord contextual-review case](https://explorer-studio.genlayer.com/tx/0x242e1769988a7643ad08d6312dd8da0a3069e753d8a2648b4d6b0547299d65e2)
 14. [Finalize the live Discord contextual-review decision](https://explorer-studio.genlayer.com/tx/0xeb225c44256dd909af9c4d754c00ea9e2e2c85135f88ac3773548123a8f97454)
+15. [Update `no-profanity` to the context-aware starter rule](https://explorer-studio.genlayer.com/tx/0x7ba1e2c40b9240efeb729900199ddbc14c6139df75b6918946736a43f28caa9a)
+16. [Update `no-targeted-abuse`](https://explorer-studio.genlayer.com/tx/0x80a5f3eacadb47427c8bdf6249efa8f74610142d2e7eb0225a363a73bfece9bd)
+17. [Update `no-external-invites`](https://explorer-studio.genlayer.com/tx/0xf8f57dd5a27c395f641ac6badb9c779972e6bf2b77344bc19b66c001c2128d59)
+18. [Update `no-message-flooding`](https://explorer-studio.genlayer.com/tx/0x62f0791022e3adc31d6198897c90fefbb94353a36022b0b01f638e583dda33ad)
+19. [Update `no-repeated-spam`](https://explorer-studio.genlayer.com/tx/0x7ed3606031822033d598cab1569843ee0a0701abf53248ba68934f49327425f9)
+20. [Update `no-mass-mentions`](https://explorer-studio.genlayer.com/tx/0xc070ddb31fd73f3f533e8fd9eb58dfc06fb67db4877e3adab81d8182387f9318)
+21. [Open the non-targeted praise case](https://explorer-studio.genlayer.com/tx/0x7501a90210d7f9975ca16dad13140ba647baf6a45091fb12bf87b913990b00d4)
+22. [Finalize the non-targeted praise case as allowed](https://explorer-studio.genlayer.com/tx/0x9e0b873db0e400efda59d4079b092c3fa96613fc58058756f73552a38029d07f)
+23. [Open the targeted-insult case](https://explorer-studio.genlayer.com/tx/0xaa8416f3e6ab15efb3bdfb239c84cbc4e58526e64a6477b20f876f01955867f9)
+24. [Finalize the targeted-insult case as a violation](https://explorer-studio.genlayer.com/tx/0xacc4df48fcd4bd20a0d531a555b6e2e93338d90a89ded945b6279f00ab2c2a58)
 
 The original demo-guild readback contains three active rules and one decided case.
 That case is pinned to `no-targeted-abuse` version 1, includes the author's defence,
@@ -34,19 +45,48 @@ live Discord guild and its live contextual case are documented below.
 - Discord API readback confirms `/constitution` was replaced rather than retained as a duplicate
 - Server-registration transaction: [`0xd8968521e66b1ce87da824a3c48b3e1d3a099a153aaad72402d25f76d598d6dc`](https://explorer-studio.genlayer.com/tx/0xd8968521e66b1ce87da824a3c48b3e1d3a099a153aaad72402d25f76d598d6dc)
 - Receipt: `FINALIZED`; leader execution `SUCCESS`; three agreeing validator votes and two idle/cancelled-after-quorum votes
-- Final readback: active guild, rule-set version `3`, display name `Plain3rd's server`, and three active version-1 rules
+- Final readback: active guild with the editable six-rule starter pack plus the
+  existing custom `no-unapproved-links` rule
 - Privacy-preserving guild key: `sha256:bf2bf0aca29766a23a40bde8478dfdcfccaa8355e1d2cbe660593f19fa9b4321`
+- Hosted service health: [`ready: true` on Northflank](https://p01--commonground-bot--2tgdv5n7tzkj.code.run/health)
 
 ### Live rules and Discord tests
 
-- `no-unapproved-links` — automatic `delete_and_warn`; allows official `genlayer.com` and `genlayer.foundation` links. A live message containing an unapproved `example.com` link was deleted, a direct warning was delivered, and an enforcement record appeared in `#testing-channel`.
-- `no-profanity` — automatic `delete_and_warn`; detects configured profane terms, including separated and leetspeak spellings. A live disguised-profanity test message was deleted, a direct warning was delivered, and an enforcement record appeared in `#testing-channel`.
-- `no-targeted-abuse` — hybrid `delete_and_warn` with appeals enabled; prohibits messages intended to demean, threaten, intimidate, or drive another member away while allowing good-faith criticism, moderation reports, and clearly marked quotations.
-- `/rule list` returned all three live rules as active version 1 entries.
-- The hybrid detector left the contextual test message in place and posted a `Possible rule issue` notice, as configured by `AUTO_SUBMIT_HYBRID=false`.
-- A moderator used **Apps -> Check Rule** to open case `case-1552710674738585611-no-targeted-abuse`.
-- GenLayer finalized the case as `violation` with decision revision `1`. The on-chain analysis found that the message directly demeaned a member and attempted to drive them away, while none of the rule's exceptions applied.
-- After finalization, the bot deleted the unchanged source message, delivered a direct warning, and posted the final `CommonGround enforcement` record with the case ID.
+- The editable starter pack contains `no-profanity`, `no-targeted-abuse`,
+  `no-external-invites`, `no-message-flooding`, `no-repeated-spam`, and
+  `no-mass-mentions`. The custom `no-unapproved-links` rule remains active.
+- `/rule install-defaults replace-existing:true` upgraded the six starter rules
+  without replacing the server's custom link rule. `/rule edit-rule` can revise
+  any installed rule later.
+- `no-profanity` is deliberately context-aware. Profanity used as untargeted
+  praise or emphasis can be allowed; profanity used to attack a person is a
+  violation. Hybrid detections are automatically submitted to GenLayer in the
+  hosted demo.
+- Positive case `case-1552757069248069643-no-profanity`: the public message
+  `Fuck, this is so great!` remained visible. GenLayer finalized it as `allowed`
+  because the word was non-targeted praise/emphasis. The bot posted the allowed
+  finalization notice in Discord.
+- Violation case `case-1552757632115154955-no-profanity`: the public message
+  `You are fucking stupid.` was finalized as `violation`. The GenLayer analysis
+  identified a direct personal attack and found that no exception applied. The
+  bot deleted the source message and posted the `delete_and_warn` enforcement
+  record in Discord.
+- The hosted gateway retries transient receipt-read failures. This prevents an
+  HTML/RPC edge response from incorrectly reporting a failed Discord command
+  after an otherwise successful on-chain write.
+
+## Reproducible verification
+
+The repository verification command covers GenVM linting, direct contract
+execution, shared moderation logic, Discord commands, and the production build:
+
+- 9 direct intelligent-contract tests
+- 9 shared core tests
+- 23 Discord-bot tests
+- TypeScript type-check and production build
+
+Run `npm run verify` from the repository root. The context regression explicitly
+asserts that praise is allowed and the targeted insult is a violation.
 
 The owner-private live dashboard is available at
 [`commonground-constitution.plain3rd.chatgpt.site`](https://commonground-constitution.plain3rd.chatgpt.site).

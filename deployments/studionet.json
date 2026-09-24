@@ -20,5 +20,34 @@
     "cases": 1,
     "decisions": 1,
     "appeals": 0
+  },
+  "live_discord_verification": {
+    "verified_at": "2026-09-24",
+    "health_url": "https://p01--commonground-bot--2tgdv5n7tzkj.code.run/health",
+    "guild_key": "sha256:bf2bf0aca29766a23a40bde8478dfdcfccaa8355e1d2cbe660593f19fa9b4321",
+    "active_rules": 7,
+    "rule_updates": {
+      "no_profanity": "0x7ba1e2c40b9240efeb729900199ddbc14c6139df75b6918946736a43f28caa9a",
+      "no_targeted_abuse": "0x80a5f3eacadb47427c8bdf6249efa8f74610142d2e7eb0225a363a73bfece9bd",
+      "no_external_invites": "0xf8f57dd5a27c395f641ac6badb9c779972e6bf2b77344bc19b66c001c2128d59",
+      "no_message_flooding": "0x62f0791022e3adc31d6198897c90fefbb94353a36022b0b01f638e583dda33ad",
+      "no_repeated_spam": "0x7ed3606031822033d598cab1569843ee0a0701abf53248ba68934f49327425f9",
+      "no_mass_mentions": "0xc070ddb31fd73f3f533e8fd9eb58dfc06fb67db4877e3adab81d8182387f9318"
+    },
+    "cases": {
+      "non_targeted_praise": {
+        "case_id": "case-1552757069248069643-no-profanity",
+        "decision": "allowed",
+        "open_transaction": "0x7501a90210d7f9975ca16dad13140ba647baf6a45091fb12bf87b913990b00d4",
+        "adjudicate_transaction": "0x9e0b873db0e400efda59d4079b092c3fa96613fc58058756f73552a38029d07f"
+      },
+      "targeted_insult": {
+        "case_id": "case-1552757632115154955-no-profanity",
+        "decision": "violation",
+        "action": "delete_and_warn",
+        "open_transaction": "0xaa8416f3e6ab15efb3bdfb239c84cbc4e58526e64a6477b20f876f01955867f9",
+        "adjudicate_transaction": "0xacc4df48fcd4bd20a0d531a555b6e2e93338d90a89ded945b6279f00ab2c2a58"
+      }
+    }
   }
 }

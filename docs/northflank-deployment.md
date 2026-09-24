@@ -24,13 +24,15 @@ Verified on 24 September 2026:
   `CommonGround bot is ready`.
 - The local development bot was stopped before the hosted verification, so the
   Discord response could only have come from the Northflank deployment.
-- Running `/rule list` in the configured Discord test server returned all three
-  finalized active rules:
-  - `no-unapproved-links` v1 — automatic
-  - `no-profanity` v1 — automatic
-  - `no-targeted-abuse` v1 — hybrid
-- Earlier live messages in the test channel also show automatic link and
-  profanity enforcement plus a finalized GenLayer targeted-abuse decision.
+- Running `/rule install-defaults replace-existing:true` in the configured
+  Discord test server finalized the editable six-rule starter pack while
+  preserving the custom `no-unapproved-links` rule.
+- A non-targeted profanity example was finalized as `allowed` and remained
+  visible. A targeted insult was finalized as `violation`, deleted, and recorded
+  in the moderation channel. Both decisions came from the deployed GenLayer
+  contract rather than a hard-coded word-list outcome.
+- The live transaction and case evidence is recorded in
+  [`live-verification.md`](./live-verification.md).
 
 ## Service
 
@@ -55,10 +57,15 @@ Configure these as Northflank secrets rather than committing them:
 - `GENLAYER_PRIVATE_KEY`
 - `GENLAYER_NETWORK=studionet`
 - `GENLAYER_CONTRACT_ADDRESS`
-- `AUTO_SUBMIT_HYBRID=false`
+- `AUTO_SUBMIT_HYBRID=true`
 - `DATABASE_URL` from the project PostgreSQL addon
 - `PORT=8080`
 
 The database makes submitted transaction recovery and Discord case bindings
 survive container restarts. The GenLayer contract remains the canonical store
 for rules and finalized decisions.
+
+`AUTO_SUBMIT_HYBRID=true` is intentional for the public review deployment: a
+contextual match is submitted to GenLayer without requiring a moderator to open
+the case manually. Self-hosters can set it to `false` when they prefer explicit
+moderator approval before paying for or recording a contextual adjudication.
