@@ -2,11 +2,13 @@
 
 ## Consensus boundary
 
-CommonGround deliberately does not send every Discord message through GenLayer.
+CommonGround deliberately does not inspect or send every Discord message
+through GenLayer. It is report-driven: an ordinary message produces no rule
+evaluation, database case, or blockchain transaction.
 
 - **Discord and the bot backend own:** Discord authentication, role checks,
-  command handling, message delivery, local deterministic detectors, caching,
-  queues, retries, and executing Discord moderation actions.
+  command handling, report intake, local deterministic checks, caching, queues,
+  retries, and executing Discord moderation actions.
 - **The Intelligent Contract owns:** finalized rule-set versions, immutable
   rule snapshots, contextual case evidence, validator-backed decisions, appeal
   history, and the action selected by the pinned rule.
@@ -27,17 +29,22 @@ thresholds are deterministic and remain in the local rule engine.
    relayer wallet and persists the returned transaction ID immediately.
 5. The worker waits for successful finalization, then refreshes its
    `LATEST_FINAL` rule cache.
-6. For every opted-in public message, the local rule engine evaluates automatic
-   detectors.
-7. Hybrid rules use local detection only as candidate triage. A match never
-   proves a contextual violation; when automatic hybrid submission is enabled,
-   the exact message, bounded context, pinned rule, and exceptions go to
-   GenLayer.
-8. A moderator can right-click a message and choose `Check Rule` for a
-   contextual rule.
-9. The backend opens a case using the exact active rule version, message hash,
-   bounded context, and challenge reason.
-10. After an optional defence window, the worker calls `adjudicate_case`.
+6. Ordinary messages are ignored. Any server member can start a review by
+   replying to a message with `@CommonGround report`, using `/report` with its
+   Discord link, or choosing `Report to CommonGround` from the message menu.
+7. The backend loads the finalized active rules and chooses the relevant rule.
+   The member never has to know or enter a rule ID.
+8. A deterministic match, such as an unsolicited invite or mass mention, uses
+   the configured action immediately. A hybrid detector match or the server's
+   contextual fallback rule opens a GenLayer case.
+9. The backend opens the case using the exact active rule version, message hash,
+   bounded context, and optional reporter context. The reported message is sent
+   as the primary evidence. If it was a Discord reply, the replied-to message is
+   fetched explicitly and labeled, even when it is older than the nearby-message
+   window. Up to three nearby messages before and after are also included with
+   pseudonymous speaker labels; the report command itself is excluded.
+10. The worker calls `adjudicate_case` and tracks the submitted transaction
+    through finalization.
 11. Validators independently return `allowed`, `violation`, or
     `needs_context`. Only that enum is authoritative; free-form analysis is
     explicitly non-authoritative.
@@ -57,10 +64,11 @@ changes, so old versions and cases pinned to them remain auditable.
 
 ## Privacy boundary
 
-Contract storage and transaction calldata must be treated as public. The MVP
-therefore operates only in server channels explicitly opted into public rule
-review. DMs, private staff channels, and sensitive personal data
-must never be submitted. User, guild, channel, and message identifiers are
+Contract storage and transaction calldata must be treated as public. The bot
+therefore accepts reports only in server channels explicitly opted into public
+rule review. DMs, private staff channels, and sensitive personal data must never
+be submitted. The `/report` reason field warns that its text becomes part of the
+public GenLayer case. User, guild, channel, and message identifiers are
 hashed before they are written on-chain, but message text sent for validator
 review is necessarily visible to validators and chain observers.
 
@@ -79,7 +87,8 @@ or multi-party rule changes without changing the moderation case model.
 - Every submitted transaction ID is persisted before waiting.
 - Timeouts resume tracking the existing transaction; they never trigger a blind
   duplicate write.
-- Discord interactions are idempotent by interaction ID.
+- A message/rule pair has one deterministic case ID, so repeated member reports
+  reuse the existing case instead of creating duplicate transactions.
 - Discord actions are idempotent by case ID and finalized decision revision.
 - Contextual deletion happens only after a successful finalized transaction.
 - Cases retain the rule snapshot that was active when the case was opened.

@@ -170,11 +170,27 @@ export const commandDefinitions = [
             .setMaxLength(2_000),
         ),
     ),
-  new ContextMenuCommandBuilder()
-    .setName("Check Rule")
-    .setType(ApplicationCommandType.Message)
+  new SlashCommandBuilder()
+    .setName("report")
+    .setDescription("Report a message; CommonGround chooses the relevant rule")
     .setContexts(InteractionContextType.Guild)
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+    .addStringOption((option) =>
+      option
+        .setName("message-link")
+        .setDescription("Paste the Discord message link (right-click → Copy Message Link)")
+        .setRequired(true),
+    )
+    .addStringOption((option) =>
+      option
+        .setName("reason")
+        .setDescription("Optional context; it will be included in the public GenLayer case")
+        .setRequired(false)
+        .setMaxLength(1_000),
+    ),
+  new ContextMenuCommandBuilder()
+    .setName("Report to CommonGround")
+    .setType(ApplicationCommandType.Message)
+    .setContexts(InteractionContextType.Guild),
 ].map((command) => command.toJSON());
 
 function ruleModal(
@@ -272,32 +288,25 @@ function installSummary(
   return lines.join("\n").slice(0, 2_000);
 }
 
-function challengeModal(
-  interaction: MessageContextMenuCommandInteraction,
-): ModalBuilder {
-  return new ModalBuilder()
-    .setCustomId(
-      `challenge:${interaction.guildId}:${interaction.channelId}:${interaction.targetMessage.id}`,
-    )
-    .setTitle("Check against rule")
-    .addComponents(
-      new ActionRowBuilder<TextInputBuilder>().addComponents(
-        new TextInputBuilder()
-          .setCustomId("rule-id")
-          .setLabel("Rule ID")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMaxLength(48),
-      ),
-      new ActionRowBuilder<TextInputBuilder>().addComponents(
-        new TextInputBuilder()
-          .setCustomId("reason")
-          .setLabel("Why should this message be reviewed?")
-          .setStyle(TextInputStyle.Paragraph)
-          .setRequired(true)
-          .setMaxLength(2_000),
-      ),
-    );
+export function parseDiscordMessageLink(
+  value: string,
+): { guildId: string; channelId: string; messageId: string } | null {
+  const match = /^https:\/\/(?:canary\.|ptb\.)?discord(?:app)?\.com\/channels\/(\d+)\/(\d+)\/(\d+)(?:\?.*)?$/iu.exec(
+    value.trim(),
+  );
+  return match?.[1] && match[2] && match[3]
+    ? { guildId: match[1], channelId: match[2], messageId: match[3] }
+    : null;
+}
+
+async function reportMessage(
+  interaction: ChatInputCommandInteraction | MessageContextMenuCommandInteraction,
+  service: ModerationService,
+  message: MessageContextMenuCommandInteraction["targetMessage"],
+  reason: string,
+): Promise<void> {
+  const result = await service.reviewReportedMessage(message, reason);
+  await interaction.editReply(service.reportResultMessage(result));
 }
 
 async function handleRuleCommand(
@@ -373,6 +382,51 @@ async function handleCaseCommand(
   await interaction.editReply(`Appeal submitted: \`${hash}\``);
 }
 
+async function handleReportCommand(
+  interaction: ChatInputCommandInteraction,
+  service: ModerationService,
+): Promise<void> {
+  if (!interaction.guildId) throw new Error("Reports require a server");
+  await interaction.deferReply({ flags: EPHEMERAL });
+  const value = interaction.options.getString("message-link", true);
+  const parsed = parseDiscordMessageLink(value);
+  if (!parsed || parsed.guildId !== interaction.guildId) {
+    await interaction.editReply(
+      "Paste a message link from this server. You can also reply to the message with `@CommonGround report`.",
+    );
+    return;
+  }
+  const channel = await interaction.client.channels.fetch(parsed.channelId);
+  if (!channel?.isTextBased() || !("messages" in channel)) {
+    await interaction.editReply("I cannot access the channel in that message link.");
+    return;
+  }
+  const message = await channel.messages.fetch(parsed.messageId).catch(() => null);
+  if (!message || message.guildId !== interaction.guildId) {
+    await interaction.editReply("I cannot access that message.");
+    return;
+  }
+  await reportMessage(
+    interaction,
+    service,
+    message,
+    interaction.options.getString("reason") ?? "A server member requested a review.",
+  );
+}
+
+async function handleContextReport(
+  interaction: MessageContextMenuCommandInteraction,
+  service: ModerationService,
+): Promise<void> {
+  await interaction.deferReply({ flags: EPHEMERAL });
+  await reportMessage(
+    interaction,
+    service,
+    interaction.targetMessage,
+    "A server member requested a review from the message action.",
+  );
+}
+
 async function handleModal(
   interaction: ModalSubmitInteraction,
   service: ModerationService,
@@ -405,26 +459,6 @@ async function handleModal(
     );
     return;
   }
-  if (parts[0] === "challenge") {
-    const [, guildId, channelId, messageId] = parts;
-    if (!guildId || !channelId || !messageId || guildId !== interaction.guildId) {
-      throw new Error("Invalid challenge form");
-    }
-    await interaction.deferReply({ flags: EPHEMERAL });
-    const channel = await interaction.client.channels.fetch(channelId);
-    if (!channel?.isTextBased() || !("messages" in channel)) {
-      throw new Error("The challenged message channel is unavailable");
-    }
-    const message = await channel.messages.fetch(messageId);
-    const result = await service.openAndAdjudicateCase(
-      message,
-      interaction.fields.getTextInputValue("rule-id"),
-      interaction.fields.getTextInputValue("reason"),
-    );
-    await interaction.editReply(
-      `Case \`${result.caseId}\` opened. Transaction: \`${result.openTransactionHash}\``,
-    );
-  }
 }
 
 export async function handleInteraction(
@@ -432,7 +466,7 @@ export async function handleInteraction(
   service: ModerationService,
 ): Promise<void> {
   if (interaction.isMessageContextMenuCommand()) {
-    await interaction.showModal(challengeModal(interaction));
+    await handleContextReport(interaction, service);
     return;
   }
   if (interaction.isModalSubmit()) {
@@ -444,5 +478,7 @@ export async function handleInteraction(
     await handleRuleCommand(interaction, service);
   } else if (interaction.commandName === "case") {
     await handleCaseCommand(interaction, service);
+  } else if (interaction.commandName === "report") {
+    await handleReportCommand(interaction, service);
   }
 }

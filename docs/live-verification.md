@@ -41,7 +41,7 @@ live Discord guild and its live contextual case are documented below.
 - Discord application: `Common ground` (`1552600187556462652`)
 - Test server: `Plain3rd's server`
 - Test channel: `#testing-channel`
-- Registered command groups: `/rule`, `/case`, and `Check Rule`
+- Registered administration commands: `/rule` and `/case`
 - Discord API readback confirms `/constitution` was replaced rather than retained as a duplicate
 - Server-registration transaction: [`0xd8968521e66b1ce87da824a3c48b3e1d3a099a153aaad72402d25f76d598d6dc`](https://explorer-studio.genlayer.com/tx/0xd8968521e66b1ce87da824a3c48b3e1d3a099a153aaad72402d25f76d598d6dc)
 - Receipt: `FINALIZED`; leader execution `SUCCESS`; three agreeing validator votes and two idle/cancelled-after-quorum votes
@@ -60,8 +60,7 @@ live Discord guild and its live contextual case are documented below.
   any installed rule later.
 - `no-profanity` is deliberately context-aware. Profanity used as untargeted
   praise or emphasis can be allowed; profanity used to attack a person is a
-  violation. Hybrid detections are automatically submitted to GenLayer in the
-  hosted demo.
+  violation.
 - Positive case `case-1552757069248069643-no-profanity`: the public message
   `Fuck, this is so great!` remained visible. GenLayer finalized it as `allowed`
   because the word was non-targeted praise/emphasis. The bot posted the allowed
@@ -74,6 +73,9 @@ live Discord guild and its live contextual case are documented below.
 - The hosted gateway retries transient receipt-read failures. This prevents an
   HTML/RPC edge response from incorrectly reporting a failed Discord command
   after an otherwise successful on-chain write.
+- The current member UX is report-driven: reply with `@CommonGround report`, use
+  `/report` with a message link, or choose `Report to CommonGround`. The bot
+  selects the rule; ordinary unreported messages are ignored.
 
 ## Reproducible verification
 

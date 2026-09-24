@@ -6,11 +6,12 @@ restore the latest starter version without erasing history.
 
 ## Included rules
 
-1. `no-profanity` — hybrid, context-aware review. A local word detector finds
-   candidates, while GenLayer judges the complete message and nearby context.
+1. `no-profanity` — hybrid, context-aware review. After a member report, a
+   local word detector identifies the candidate while GenLayer judges the
+   complete message and nearby context.
 2. `no-targeted-abuse` — contextual review for personal attacks, harassment,
    intimidation, threats, and attempts to drive somebody away.
-3. `no-external-invites` — immediate removal of unsolicited Discord invites.
+3. `no-external-invites` — deterministic removal when an invite is reported.
 4. `no-message-flooding` — six messages in ten seconds.
 5. `no-repeated-spam` — the same message three times in thirty seconds.
 6. `no-mass-mentions` — five or more user or broadcast mentions in one message.
@@ -38,6 +39,14 @@ a situation, and non-targeted emphasis are explicit starter exceptions.
 - `/rule disable-rule` disables an unwanted rule.
 - `/rule list` displays the finalized active version and enforcement mode.
 
-Automatic contextual moderation requires `AUTO_SUBMIT_HYBRID=true`. Set it to
-`false` only when moderators should manually submit every candidate through
-**Apps → Check Rule**.
+## Member reporting
+
+- Reply directly to a message and send `@CommonGround report`.
+- Optionally add a reason after `report`; that reason is included in the public
+  GenLayer case.
+- Alternatively use `/report` with a copied message link or choose
+  **Apps → Report to CommonGround**.
+- CommonGround checks the active rules and selects the rule automatically.
+
+The bot ignores unreported messages. There is no background scanning and no
+transaction is created merely because somebody posts in a monitored channel.

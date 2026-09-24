@@ -1,9 +1,9 @@
 import {
-  ActivityTracker,
   DEFAULT_RULES,
   evaluateRules,
   hashDiscordIdentifier,
   hashMessageSnapshot,
+  type ActivitySnapshot,
   type ConstitutionRule,
   type EditableRuleInput,
   type MessageSample,
@@ -28,8 +28,104 @@ export interface DefaultRuleInstallResult {
   transactionHashes: string[];
 }
 
+export type ReportReviewResult =
+  | {
+      kind: "enforced";
+      checkedRules: number;
+      ruleId: string;
+      ruleName: string;
+      action: string;
+    }
+  | {
+      kind: "submitted";
+      checkedRules: number;
+      ruleId: string;
+      ruleName: string;
+      caseId: string;
+      transactionHash: string;
+    }
+  | {
+      kind: "already_reported";
+      checkedRules: number;
+      ruleId: string;
+      ruleName: string;
+      caseId: string;
+    }
+  | { kind: "clear"; checkedRules: number }
+  | { kind: "channel_not_configured"; checkedRules: 0 };
+
+export interface ReportRuleSelection {
+  kind: "enforce" | "review";
+  rule: ConstitutionRule;
+  detectorReason?: string;
+}
+
+export function parseReplyReport(
+  content: string,
+  botUserId: string,
+): { reason: string } | null {
+  const withoutMention = content
+    .replace(new RegExp(`<@!?${botUserId}>`, "gu"), " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+  const match = /^(?:please\s+)?(?:report|review|check)\b\s*(.*)$/iu.exec(
+    withoutMention,
+  );
+  if (!match) return null;
+  const reason = (match[1] ?? "")
+    .replace(/^(?:this|message)\b\s*[:\-]?\s*/iu, "")
+    .trim();
+  return { reason };
+}
+
+export function selectRuleForReport(
+  rules: ReadonlyArray<ConstitutionRule>,
+  sample: MessageSample,
+  activity: ActivitySnapshot = { authorMessages: [] },
+): ReportRuleSelection | null {
+  const activeRules = rules.filter((rule) => rule.active);
+  const byId = new Map(activeRules.map((rule) => [rule.rule_id, rule]));
+  const evaluations = evaluateRules(activeRules, sample, activity);
+
+  const deterministic = evaluations.find(
+    (evaluation) => evaluation.outcome === "violation" && evaluation.detector,
+  );
+  if (deterministic?.detector) {
+    const rule = byId.get(deterministic.ruleId);
+    if (rule) {
+      return {
+        kind: "enforce",
+        rule,
+        detectorReason: deterministic.detector.reason,
+      };
+    }
+  }
+
+  const detectedReview = evaluations.find(
+    (evaluation) => evaluation.outcome === "review" && evaluation.detector,
+  );
+  if (detectedReview?.detector) {
+    const rule = byId.get(detectedReview.ruleId);
+    if (rule) {
+      return {
+        kind: "review",
+        rule,
+        detectorReason: detectedReview.detector.reason,
+      };
+    }
+  }
+
+  const contextual =
+    activeRules.find(
+      (rule) => rule.rule_id === "no-targeted-abuse" && rule.mode === "contextual",
+    ) ?? activeRules.find((rule) => rule.mode === "contextual");
+  if (contextual) return { kind: "review", rule: contextual };
+
+  const hybrid = activeRules.find((rule) => rule.mode === "hybrid");
+  return hybrid ? { kind: "review", rule: hybrid } : null;
+}
+
 export class ModerationService {
-  readonly #activity = new ActivityTracker();
   readonly #cache: RuleCache;
   readonly #actions: DiscordActionExecutor;
 
@@ -210,59 +306,113 @@ export class ModerationService {
 
   async handleMessage(message: Message): Promise<void> {
     if (!message.guildId || message.author.bot) return;
-    if (
-      this.config.monitoredChannelIds.size > 0 &&
-      !this.config.monitoredChannelIds.has(message.channelId)
-    ) {
-      return;
-    }
+    const botUserId = this.client.user?.id;
+    if (!botUserId || !message.mentions.users.has(botUserId)) return;
+    const request = parseReplyReport(message.content, botUserId);
+    if (!request) return;
 
-    const sample: MessageSample = {
-      id: message.id,
-      guildId: message.guildId,
-      channelId: message.channelId,
-      authorId: message.author.id,
-      content: message.content,
-      createdAt: message.createdTimestamp,
-      mentionCount: message.mentions.users.size,
-    };
-    const activity = this.#activity.snapshot(sample);
-    this.#activity.record(sample);
-
-    let rules: ConstitutionRule[];
-    try {
-      rules = await this.listRules(message.guildId);
-    } catch (error) {
-      logger.error({ error, guildId: message.guildId }, "failed to load rule set");
-      return;
-    }
-
-    const evaluations = evaluateRules(rules, sample, activity);
-    const violation = evaluations.find((evaluation) => evaluation.outcome === "violation");
-    if (violation?.detector) {
-      await this.#actions.execute(
-        message,
-        violation.action,
-        `${violation.detector.reason} Rule ${violation.ruleId} v${violation.ruleVersion}`,
-        undefined,
-        violation.ruleId,
+    if (!message.reference?.messageId) {
+      await message.reply(
+        "Reply directly to the message you want checked, then type `@CommonGround report`. You can also use `/report` with a Discord message link.",
       );
       return;
     }
 
-    const review = evaluations.find((evaluation) => evaluation.outcome === "review");
-    if (review?.detector) {
-      if (this.config.autoSubmitHybrid) {
-        await this.openAndAdjudicateCase(
-          message,
-          review.ruleId,
-          `Automatic detector requested review: ${review.detector.reason}`,
-        );
-      } else {
-        await this.#actions.log(
-          `**Possible rule issue**\nMessage: ${message.url}\nRule: \`${review.ruleId}\`\n${review.detector.reason}\nA moderator can use **Apps → Check Rule**.`,
-        );
-      }
+    const target = await message.fetchReference().catch(() => null);
+    if (!target || target.guildId !== message.guildId) {
+      await message.reply("I could not access the message you replied to.");
+      return;
+    }
+
+    const result = await this.reviewReportedMessage(
+      target,
+      request.reason || "A server member requested a review.",
+    );
+    await message.reply(this.reportResultMessage(result));
+  }
+
+  async reviewReportedMessage(
+    message: Message,
+    challengeReason: string,
+  ): Promise<ReportReviewResult> {
+    if (!message.guildId) throw new Error("Reports require a server message");
+    if (
+      this.config.monitoredChannelIds.size > 0 &&
+      !this.config.monitoredChannelIds.has(message.channelId)
+    ) {
+      return { kind: "channel_not_configured", checkedRules: 0 };
+    }
+
+    const rules = await this.listRules(message.guildId);
+    const activeRules = rules.filter((rule) => rule.active);
+    const sample = this.messageSample(message);
+    const activity = await this.buildActivityForReport(message);
+    const selection = selectRuleForReport(activeRules, sample, activity);
+    if (!selection) return { kind: "clear", checkedRules: activeRules.length };
+
+    if (selection.kind === "enforce") {
+      await this.#actions.execute(
+        message,
+        selection.rule.action,
+        `Member report matched ${selection.rule.name}. ${selection.detectorReason ?? ""}`.trim(),
+        undefined,
+        selection.rule.rule_id,
+      );
+      return {
+        kind: "enforced",
+        checkedRules: activeRules.length,
+        ruleId: selection.rule.rule_id,
+        ruleName: selection.rule.name,
+        action: selection.rule.action,
+      };
+    }
+
+    const caseId = this.caseId(message, selection.rule.rule_id);
+    if (await this.store.getCaseBinding(caseId)) {
+      return {
+        kind: "already_reported",
+        checkedRules: activeRules.length,
+        ruleId: selection.rule.rule_id,
+        ruleName: selection.rule.name,
+        caseId,
+      };
+    }
+
+    const reason = [
+      `Community report. CommonGround selected ${selection.rule.name} from ${activeRules.length} active rules.`,
+      selection.detectorReason,
+      challengeReason.trim() ? `Reporter context: ${challengeReason.trim()}` : undefined,
+    ]
+      .filter((item): item is string => Boolean(item))
+      .join(" ")
+      .slice(0, 2_000);
+    const opened = await this.openAndAdjudicateCase(
+      message,
+      selection.rule.rule_id,
+      reason,
+    );
+    return {
+      kind: "submitted",
+      checkedRules: activeRules.length,
+      ruleId: selection.rule.rule_id,
+      ruleName: selection.rule.name,
+      caseId: opened.caseId,
+      transactionHash: opened.openTransactionHash,
+    };
+  }
+
+  reportResultMessage(result: ReportReviewResult): string {
+    switch (result.kind) {
+      case "enforced":
+        return `Checked ${result.checkedRules} active rules. **${result.ruleName}** matched, so the configured \`${result.action}\` action was applied.`;
+      case "submitted":
+        return `Report accepted. I checked ${result.checkedRules} active rules and selected **${result.ruleName}** for GenLayer review. Case: \`${result.caseId}\`. Transaction: \`${result.transactionHash}\`.`;
+      case "already_reported":
+        return `That message is already being reviewed under **${result.ruleName}**. Case: \`${result.caseId}\`.`;
+      case "channel_not_configured":
+        return "This channel is not configured for public CommonGround review.";
+      case "clear":
+        return `Checked ${result.checkedRules} active rules, but none can be applied to this report.`;
     }
   }
 
@@ -272,7 +422,7 @@ export class ModerationService {
     challengeReason: string,
   ): Promise<{ caseId: string; openTransactionHash: string }> {
     if (!message.guildId) throw new Error("Cases require a server message");
-    const caseId = `case-${message.id}-${ruleId.slice(0, 24)}`;
+    const caseId = this.caseId(message, ruleId);
     const context = await this.buildContext(message);
     const messageHash = hashMessageSnapshot(message.content);
     await this.store.saveCaseBinding({
@@ -430,14 +580,91 @@ export class ModerationService {
 
   private async buildContext(message: Message): Promise<string> {
     if (!("messages" in message.channel)) return "";
+    const [replyParent, preceding, following] = await Promise.all([
+      message.reference?.messageId
+        ? message.fetchReference().catch(() => null)
+        : Promise.resolve(null),
+      message.channel.messages
+        .fetch({ before: message.id, limit: 3 })
+        .catch(() => null),
+      message.channel.messages
+        .fetch({ after: message.id, limit: 3 })
+        .catch(() => null),
+    ]);
+
+    const labels = new Map<string, string>();
+    let nextMember = 1;
+    const authorLabel = (item: Message): string => {
+      if (item.author.bot) return "bot";
+      if (item.author.id === message.author.id) return "reported-author";
+      let label = labels.get(item.author.id);
+      if (!label) {
+        label = `member-${nextMember}`;
+        nextMember += 1;
+        labels.set(item.author.id, label);
+      }
+      return label;
+    };
+    const line = (position: string, item: Message): string =>
+      `${position} [${authorLabel(item)}]: ${item.content.slice(0, 2_000)}`;
+    const isReportCommand = (item: Message): boolean => {
+      const botUserId = this.client.user?.id;
+      return Boolean(
+        botUserId &&
+          item.mentions.users.has(botUserId) &&
+          parseReplyReport(item.content, botUserId),
+      );
+    };
+
+    const context: string[] = [];
+    if (replyParent) {
+      context.push(line("replied-to", replyParent));
+    }
+
+    const parentId = replyParent?.id;
+    const before = preceding
+      ? Array.from(preceding.values())
+          .filter((item) => item.id !== parentId && !isReportCommand(item))
+          .sort((a, b) => a.createdTimestamp - b.createdTimestamp)
+      : [];
+    const after = following
+      ? Array.from(following.values())
+          .filter((item) => !isReportCommand(item))
+          .sort((a, b) => a.createdTimestamp - b.createdTimestamp)
+      : [];
+    context.push(...before.map((item) => line("before", item)));
+    context.push(...after.map((item) => line("after", item)));
+    return context.join("\n").slice(0, 8_000);
+  }
+
+  private caseId(message: Message, ruleId: string): string {
+    return `case-${message.id}-${ruleId.slice(0, 24)}`;
+  }
+
+  private messageSample(message: Message): MessageSample {
+    return {
+      id: message.id,
+      guildId: message.guildId ?? "",
+      channelId: message.channelId,
+      authorId: message.author.id,
+      content: message.content,
+      createdAt: message.createdTimestamp,
+      mentionCount:
+        message.mentions.users.size +
+        (message.mentions.everyone ? 1 : 0),
+    };
+  }
+
+  private async buildActivityForReport(message: Message): Promise<ActivitySnapshot> {
+    if (!("messages" in message.channel)) return { authorMessages: [] };
     const preceding = await message.channel.messages
-      .fetch({ before: message.id, limit: 3 })
+      .fetch({ before: message.id, limit: 100 })
       .catch(() => null);
-    if (!preceding) return "";
-    return preceding
-      .reverse()
-      .map((item) => `${item.author.bot ? "bot" : "member"}: ${item.content}`)
-      .join("\n")
-      .slice(0, 8_000);
+    if (!preceding) return { authorMessages: [] };
+    return {
+      authorMessages: preceding
+        .filter((item) => item.author.id === message.author.id)
+        .map((item) => this.messageSample(item)),
+    };
   }
 }

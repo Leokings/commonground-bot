@@ -57,7 +57,6 @@ Configure these as Northflank secrets rather than committing them:
 - `GENLAYER_PRIVATE_KEY`
 - `GENLAYER_NETWORK=studionet`
 - `GENLAYER_CONTRACT_ADDRESS`
-- `AUTO_SUBMIT_HYBRID=true`
 - `DATABASE_URL` from the project PostgreSQL addon
 - `PORT=8080`
 
@@ -65,7 +64,7 @@ The database makes submitted transaction recovery and Discord case bindings
 survive container restarts. The GenLayer contract remains the canonical store
 for rules and finalized decisions.
 
-`AUTO_SUBMIT_HYBRID=true` is intentional for the public review deployment: a
-contextual match is submitted to GenLayer without requiring a moderator to open
-the case manually. Self-hosters can set it to `false` when they prefer explicit
-moderator approval before paying for or recording a contextual adjudication.
+The hosted bot is report-driven. It ignores every ordinary message and starts a
+check only after a member explicitly reports a message. `AUTO_SUBMIT_HYBRID` is
+retained as a backwards-compatible environment variable but no longer enables
+background message scanning.
