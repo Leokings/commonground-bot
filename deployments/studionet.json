@@ -1,0 +1,24 @@
+{
+  "network": "studionet",
+  "chain_id": 61999,
+  "contract_address": "0xf8145e93E2Ab9Ea40bA39707A6Ae4b1663a88A90",
+  "deployment_transaction": "0xef16c8551190023d6bf9427333901cbb3d1ec680a4a470969beb6ec7b3ffcc6b",
+  "demo_guild_key": "commonground-demo",
+  "transactions": {
+    "register_guild": "0x5dfff3f50ce4193cf41aa769a3089155df72b994f60ef9e318c99930f567591e",
+    "add_no_external_links": "0xd2b849a46d62894ff0afa2ccd471958f1c8c6fb893dfe84a0bbe345c6ea64554",
+    "add_no_targeted_abuse": "0x9525af8948927373616d441cdc1e31ff20ed856e337ba8b8d27020dbaedc32bb",
+    "add_flood_control": "0xc469e99af54b0c172b0515f24757310a72a1f8e6ece9a6fd3d11ca1db2530476",
+    "open_case": "0x71ea426d63403bf7dc1a6f0a8cb6ec38926d3bb52e26604e5b15a26006d587a5",
+    "submit_defense": "0x0e10297214b1f940570379637d19161a77872e656eb328f5409750f3a2861e5b",
+    "adjudicate_case": "0x2d07da160f6e6d998eef1103960c47a94da4300f494b7c2332f1e6cb2a49f14f"
+  },
+  "expected_state": {
+    "guilds": 1,
+    "rules": 3,
+    "rule_versions": 3,
+    "cases": 1,
+    "decisions": 1,
+    "appeals": 0
+  }
+}

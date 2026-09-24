@@ -1,0 +1,12 @@
+.env
+.env.local
+.venv/
+__pycache__/
+.pytest_cache/
+artifacts/
+/apps/web/
+node_modules/
+.next/
+coverage/
+dist/
+*.log

@@ -1,0 +1,31 @@
+{
+  "name": "commonground-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.19 <25"
+  },
+  "workspaces": [
+    "apps/bot",
+    "packages/*"
+  ],
+  "scripts": {
+    "bot:dev": "npm run dev -w @commonground/bot",
+    "bot:register": "npm run register -w @commonground/bot",
+    "bot:start": "npm run start -w @commonground/bot",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:contract": "pytest tests/direct -q",
+    "lint:contract": "genvm-lint check contracts/discord_constitution.py --json",
+    "schema:contract": "genvm-lint schema contracts/discord_constitution.py --output abi/discord_constitution.json",
+    "verify": "npm run lint:contract && npm run test:contract && npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "5.0.1"
+  }
+}
