@@ -84,11 +84,16 @@ execution, shared moderation logic, Discord commands, and the production build:
 
 - 9 direct intelligent-contract tests
 - 9 shared core tests
-- 23 Discord-bot tests
+- 31 Discord-bot tests
 - TypeScript type-check and production build
 
 Run `npm run verify` from the repository root. The context regression explicitly
 asserts that praise is allowed and the targeted insult is a violation.
+
+The report-driven release was deployed on 24 September 2026 as Northflank pod
+`commonground-bot-55694fbd9b-mdzmr`. Northflank showed `1/1 passing`, the bot
+logged `CommonGround bot is ready`, the public health endpoint returned
+`ready: true`, and Discord accepted all four current command definitions.
 
 The owner-private live dashboard is available at
 [`commonground-constitution.plain3rd.chatgpt.site`](https://commonground-constitution.plain3rd.chatgpt.site).
