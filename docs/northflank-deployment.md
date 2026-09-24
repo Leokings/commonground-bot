@@ -4,6 +4,34 @@ CommonGround runs as an always-on Northflank service. The container exposes a
 small HTTP endpoint for platform health checks while the Discord Gateway
 connection remains the moderation transport.
 
+## Live deployment
+
+- Public health URL: <https://p01--commonground-bot--2tgdv5n7tzkj.code.run/health>
+- GitHub repository: <https://github.com/Leokings/commonground-bot>
+- Container image: `ghcr.io/leokings/commonground-bot:latest`
+- Northflank project: `plain3rd`
+- Service: `commonground-bot`
+- PostgreSQL addon: `commonground-db`
+- Secret group: `commonground-secrets`
+
+## Live verification
+
+Verified on 24 September 2026:
+
+- The public health endpoint returned HTTP `200` with
+  `{"service":"commonground-bot","ready":true,"network":"studionet"}`.
+- Northflank reported the service as running and the hosted process logged
+  `CommonGround bot is ready`.
+- The local development bot was stopped before the hosted verification, so the
+  Discord response could only have come from the Northflank deployment.
+- Running `/rule list` in the configured Discord test server returned all three
+  finalized active rules:
+  - `no-unapproved-links` v1 — automatic
+  - `no-profanity` v1 — automatic
+  - `no-targeted-abuse` v1 — hybrid
+- Earlier live messages in the test channel also show automatic link and
+  profanity enforcement plus a finalized GenLayer targeted-abuse decision.
+
 ## Service
 
 - Build type: Dockerfile
