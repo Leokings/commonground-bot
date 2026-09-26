@@ -5,7 +5,7 @@
 - App: <https://commonground-bot.vercel.app>
 - Discord install: <https://discord.com/oauth2/authorize?client_id=1552600187556462652&permissions=76800&integration_type=0&scope=bot%20applications.commands>
 - Source: <https://github.com/Leokings/commonground-bot>
-- Intelligent Contract: <https://explorer-studio.genlayer.com/address/0xf8145e93E2Ab9Ea40bA39707A6Ae4b1663a88A90>
+- Intelligent Contract: <https://explorer-studio.genlayer.com/address/0x01858Aad8C071fE3677588C6d3b107da47d879C8>
 - Hosted bot health: <https://p01--commonground-bot--2tgdv5n7tzkj.code.run/health>
 
 ## First-time test
@@ -23,11 +23,26 @@
 6. For contextual language, the bot returns a case ID and GenLayer transaction
    hash, waits for finalization, and posts the final decision in the originating
    server.
+7. The reported-message author or a server moderator can run `/case appeal`.
+   The command waits for revision 2 and announces whether the decision changed.
 
 CommonGround ignores ordinary messages. It checks only a message that a member
 reports. Reports from private channels and private threads are rejected.
 
-## Existing live transaction evidence
+## Current appeal and recovery evidence
+
+- Repaired contract deployment: <https://explorer-studio.genlayer.com/tx/0x00054cbbc97eced2172550d92eada348ead2d88a4c1be49896b855ab37b66b93>
+- Changed-decision case opened: <https://explorer-studio.genlayer.com/tx/0xf43ef19fc38b14911db3e3b144c713fbdaa9c47fa49c9cdce9259e7cbfabb5f9>
+- Initial `violation` finalized at revision 1: <https://explorer-studio.genlayer.com/tx/0x150f6703cd480895b320e05c9bd807232fc2ccdae76b3cd9579e2e88f05437ce>
+- Authorized same-server appeal changed the decision to `allowed` at revision 2: <https://explorer-studio.genlayer.com/tx/0x3c438624d8970ef677ba999c20568c8ab7781fc48e0546e9ec4969fd8b8ae180>
+- Cross-server appeal rejected before consuming the appeal: <https://explorer-studio.genlayer.com/tx/0xe0c067e20956367c5a8fd7015e168827902d6f903f18fe60c3938d4f24873e4d>
+
+Final readback for `reviewer-changed-appeal-20260926` is `allowed`, revision
+`2`, appeal count `1`, with both the original and appeal decisions preserved.
+The rejected cross-server attempt left its separate proof case at revision `1`
+and appeal count `0`; its later valid same-server appeal then finalized.
+
+## Earlier member-report evidence
 
 - Case opened: <https://explorer-studio.genlayer.com/tx/0x71232b8447b3f12f1d3c98c5a0c80b9bc1991c0b6979368510563be39894a248>
 - Decision finalized: <https://explorer-studio.genlayer.com/tx/0x28dd6e26d304fbfdc850a1f686c2c04f15e093e212c4bedbe2a57c96abbf4edf>

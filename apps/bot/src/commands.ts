@@ -368,7 +368,7 @@ async function handleCaseCommand(
   const subcommand = interaction.options.getSubcommand();
   const caseId = interaction.options.getString("case-id", true);
   if (subcommand === "status") {
-    const item = await service.getCase(caseId);
+    const item = await service.getCase(interaction.guildId, caseId);
     await interaction.editReply(
       `Case \`${item.case_id}\`\nDecision: \`${item.decision}\`\nStatus: \`${item.status}\`\nRule: \`${item.rule_id}\` v${item.rule_version}\n${item.analysis}`.slice(
         0,
@@ -378,8 +378,23 @@ async function handleCaseCommand(
     return;
   }
   const reason = interaction.options.getString("reason", true);
-  const hash = await service.appealCase(interaction.guildId, caseId, reason);
-  await interaction.editReply(`Appeal submitted: \`${hash}\``);
+  const canModerate = Boolean(
+    interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages) ||
+      interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) ||
+      interaction.memberPermissions?.has(PermissionFlagsBits.Administrator),
+  );
+  try {
+    const result = await service.appealCase(interaction.guildId, caseId, reason, {
+      userId: interaction.user.id,
+      canModerate,
+    });
+    await interaction.editReply(
+      `Appeal finalized: \`${result.transactionHash}\`\nRevision: \`${result.case.decision_revision}\`\nDecision: \`${result.case.decision}\``,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "The appeal failed.";
+    await interaction.editReply(message.slice(0, 2_000));
+  }
 }
 
 async function handleReportCommand(

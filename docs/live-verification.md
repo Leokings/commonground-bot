@@ -1,10 +1,41 @@
 # Live verification
 
 CommonGround is deployed to the GenLayer Studio Network at
-[`0xf8145e93E2Ab9Ea40bA39707A6Ae4b1663a88A90`](https://explorer-studio.genlayer.com/address/0xf8145e93E2Ab9Ea40bA39707A6Ae4b1663a88A90).
+[`0x01858Aad8C071fE3677588C6d3b107da47d879C8`](https://explorer-studio.genlayer.com/address/0x01858Aad8C071fE3677588C6d3b107da47d879C8).
 
-Every transaction below reached `FINALIZED`; the current explorer displays the
-consensus result as `Accepted` and the GenVM execution result as `SUCCESS`:
+Every successful transaction below reached `FINALIZED`; the explorer displays
+the consensus result as `Accepted` and the GenVM execution result as `SUCCESS`.
+The one intentionally rejected transaction is identified separately.
+
+## Appeal-authorization remediation
+
+1. [Deploy the repaired Intelligent Contract](https://explorer-studio.genlayer.com/tx/0x00054cbbc97eced2172550d92eada348ead2d88a4c1be49896b855ab37b66b93)
+2. [Register the live Discord server](https://explorer-studio.genlayer.com/tx/0x842303af7fb352a2cd409b62ab9c84cb785b4648b915a3f6a805b999162476de)
+3. [Open the changed-decision proof case](https://explorer-studio.genlayer.com/tx/0xf43ef19fc38b14911db3e3b144c713fbdaa9c47fa49c9cdce9259e7cbfabb5f9)
+4. [Finalize the original decision as `violation`, revision 1](https://explorer-studio.genlayer.com/tx/0x150f6703cd480895b320e05c9bd807232fc2ccdae76b3cd9579e2e88f05437ce)
+5. [Finalize the authorized same-server appeal as `allowed`, revision 2](https://explorer-studio.genlayer.com/tx/0x3c438624d8970ef677ba999c20568c8ab7781fc48e0546e9ec4969fd8b8ae180)
+
+The final `get_case("reviewer-changed-appeal-20260926")` readback is
+`decision: allowed`, `decision_revision: 2`, and `appeal_count: 1`. Its history
+preserves revision 1 (`violation`, initial) and revision 2 (`allowed`, appeal).
+The appeal analysis applies the rule's quotation/moderation-evidence exception
+to the additional bounded context.
+
+[This cross-guild appeal](https://explorer-studio.genlayer.com/tx/0xe0c067e20956367c5a8fd7015e168827902d6f903f18fe60c3938d4f24873e4d)
+finalized with the expected contract rollback. Immediate readback remained
+`decision_revision: 1` and `appeal_count: 0`, proving the rejected request did
+not consume the case's appeal. The direct and bot regression suites separately
+cover a non-owner contract caller and an unrelated Discord member.
+
+The live server's custom rule and six-rule starter pack were migrated to the
+new contract in seven individually finalized transactions. Current readback is
+seven active rules.
+
+## Earlier end-to-end evidence
+
+The following transactions remain immutable evidence from the preceding
+deployment at
+[`0xf8145e93E2Ab9Ea40bA39707A6Ae4b1663a88A90`](https://explorer-studio.genlayer.com/address/0xf8145e93E2Ab9Ea40bA39707A6Ae4b1663a88A90):
 
 1. [Deploy the Intelligent Contract](https://explorer-studio.genlayer.com/tx/0xef16c8551190023d6bf9427333901cbb3d1ec680a4a470969beb6ec7b3ffcc6b)
 2. [Register the demo Discord guild](https://explorer-studio.genlayer.com/tx/0x5dfff3f50ce4193cf41aa769a3089155df72b994f60ef9e318c99930f567591e)
@@ -106,9 +137,9 @@ live Discord guild and its live contextual case are documented below.
 The repository verification command covers GenVM linting, direct contract
 execution, shared moderation logic, Discord commands, and the production build:
 
-- 9 direct intelligent-contract tests
+- 10 direct intelligent-contract tests
 - 9 shared core tests
-- 38 Discord-bot tests
+- 43 Discord-bot tests
 - TypeScript type-check and production build
 
 Run `npm run verify` from the repository root. The context regression explicitly

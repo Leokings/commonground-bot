@@ -10,6 +10,7 @@ export type OperationKind =
   | "appeal_case";
 
 export type OperationStatus = "submitted" | "finalized" | "failed";
+export type FinalizedDecision = "allowed" | "violation" | "needs_context";
 
 export interface StoredOperation {
   transactionHash: string;
@@ -31,6 +32,9 @@ export interface CaseBinding {
   messageHash: string;
   ruleId: string;
   action: string;
+  finalizedRevision: number;
+  finalizedDecision?: FinalizedDecision;
+  finalizedAt?: string;
 }
 
 export interface OperationStore {
@@ -44,12 +48,18 @@ export interface OperationStore {
   pendingOperations(): Promise<StoredOperation[]>;
   saveCaseBinding(binding: CaseBinding): Promise<void>;
   getCaseBinding(caseId: string): Promise<CaseBinding | null>;
+  updateCaseFinalizedState(
+    caseId: string,
+    revision: number,
+    decision: FinalizedDecision,
+  ): Promise<void>;
   recordStrike(
     eventId: string,
     guildId: string,
     authorId: string,
     ruleId: string,
   ): Promise<number>;
+  retractStrike(eventId: string): Promise<boolean>;
 }
 
 export class MemoryOperationStore implements OperationStore {
@@ -94,6 +104,22 @@ export class MemoryOperationStore implements OperationStore {
     return this.#cases.get(caseId) ?? null;
   }
 
+  async updateCaseFinalizedState(
+    caseId: string,
+    revision: number,
+    decision: FinalizedDecision,
+  ): Promise<void> {
+    const existing = this.#cases.get(caseId);
+    if (!existing) throw new Error(`Unknown case binding ${caseId}`);
+    if (revision <= existing.finalizedRevision) return;
+    this.#cases.set(caseId, {
+      ...existing,
+      finalizedRevision: revision,
+      finalizedDecision: decision,
+      finalizedAt: new Date().toISOString(),
+    });
+  }
+
   async recordStrike(
     eventId: string,
     guildId: string,
@@ -106,6 +132,10 @@ export class MemoryOperationStore implements OperationStore {
     return Array.from(this.#strikes.values()).filter(
       (strike) => strike.guildId === guildId && strike.authorId === authorId,
     ).length;
+  }
+
+  async retractStrike(eventId: string): Promise<boolean> {
+    return this.#strikes.delete(eventId);
   }
 }
 
@@ -138,8 +168,17 @@ export class PostgresOperationStore implements OperationStore {
         author_id TEXT NOT NULL,
         message_hash TEXT NOT NULL,
         rule_id TEXT NOT NULL,
-        action TEXT NOT NULL
+        action TEXT NOT NULL,
+        finalized_revision INTEGER NOT NULL DEFAULT 0,
+        finalized_decision TEXT,
+        finalized_at TIMESTAMPTZ
       );
+      ALTER TABLE commonground_case_bindings
+        ADD COLUMN IF NOT EXISTS finalized_revision INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE commonground_case_bindings
+        ADD COLUMN IF NOT EXISTS finalized_decision TEXT;
+      ALTER TABLE commonground_case_bindings
+        ADD COLUMN IF NOT EXISTS finalized_at TIMESTAMPTZ;
       CREATE TABLE IF NOT EXISTS commonground_strikes (
         event_id TEXT PRIMARY KEY,
         guild_id TEXT NOT NULL,
@@ -217,8 +256,9 @@ export class PostgresOperationStore implements OperationStore {
   async saveCaseBinding(binding: CaseBinding): Promise<void> {
     await this.#pool.query(
       `INSERT INTO commonground_case_bindings
-        (case_id, guild_id, channel_id, message_id, author_id, message_hash, rule_id, action)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        (case_id, guild_id, channel_id, message_id, author_id, message_hash, rule_id,
+         action, finalized_revision, finalized_decision, finalized_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        ON CONFLICT (case_id) DO NOTHING`,
       [
         binding.caseId,
@@ -229,6 +269,9 @@ export class PostgresOperationStore implements OperationStore {
         binding.messageHash,
         binding.ruleId,
         binding.action,
+        binding.finalizedRevision,
+        binding.finalizedDecision ?? null,
+        binding.finalizedAt ?? null,
       ],
     );
   }
@@ -243,9 +286,13 @@ export class PostgresOperationStore implements OperationStore {
       message_hash: string;
       rule_id: string;
       action: string;
+      finalized_revision: number;
+      finalized_decision: FinalizedDecision | null;
+      finalized_at: Date | null;
     }>(
       `SELECT case_id, guild_id, channel_id, message_id, author_id,
-              message_hash, rule_id, action
+              message_hash, rule_id, action, finalized_revision,
+              finalized_decision, finalized_at
        FROM commonground_case_bindings
        WHERE case_id = $1`,
       [caseId],
@@ -261,8 +308,34 @@ export class PostgresOperationStore implements OperationStore {
           messageHash: row.message_hash,
           ruleId: row.rule_id,
           action: row.action,
+          finalizedRevision: row.finalized_revision,
+          ...(row.finalized_decision === null
+            ? {}
+            : { finalizedDecision: row.finalized_decision }),
+          ...(row.finalized_at === null
+            ? {}
+            : { finalizedAt: row.finalized_at.toISOString() }),
         }
       : null;
+  }
+
+  async updateCaseFinalizedState(
+    caseId: string,
+    revision: number,
+    decision: FinalizedDecision,
+  ): Promise<void> {
+    const result = await this.#pool.query(
+      `UPDATE commonground_case_bindings
+       SET finalized_revision = $2, finalized_decision = $3, finalized_at = NOW()
+       WHERE case_id = $1 AND finalized_revision < $2`,
+      [caseId, revision, decision],
+    );
+    if (result.rowCount === 1) return;
+    const existing = await this.#pool.query(
+      `SELECT 1 FROM commonground_case_bindings WHERE case_id = $1`,
+      [caseId],
+    );
+    if (existing.rowCount !== 1) throw new Error(`Unknown case binding ${caseId}`);
   }
 
   async recordStrike(
@@ -284,6 +357,14 @@ export class PostgresOperationStore implements OperationStore {
       [guildId, authorId],
     );
     return Number(result.rows[0]?.count ?? "0");
+  }
+
+  async retractStrike(eventId: string): Promise<boolean> {
+    const result = await this.#pool.query(
+      `DELETE FROM commonground_strikes WHERE event_id = $1`,
+      [eventId],
+    );
+    return result.rowCount === 1;
   }
 }
 

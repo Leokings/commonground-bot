@@ -13,6 +13,17 @@ import type { BotConfig } from "./config.js";
 import { logger } from "./logger.js";
 import { inspectReceiptExecution } from "./transaction.js";
 
+const finalizedDecisionSchema = z.enum(["allowed", "violation", "needs_context"]);
+const decisionRecordSchema = z.object({
+  revision: z.number().int().positive(),
+  kind: z.enum(["initial", "appeal"]),
+  decision: finalizedDecisionSchema,
+  analysis: z.string(),
+  analysis_provenance: z.string(),
+  decided_at: z.string(),
+  appeal_reason: z.string().optional(),
+});
+
 const caseSchema = z.object({
   case_id: z.string(),
   guild_key: z.string(),
@@ -24,11 +35,12 @@ const caseSchema = z.object({
   context: z.string(),
   challenge_reason: z.string(),
   author_defense: z.string(),
-  decision: z.enum(["pending", "allowed", "violation", "needs_context"]),
+  decision: z.union([z.literal("pending"), finalizedDecisionSchema]),
   analysis: z.string(),
   status: z.string(),
   decision_revision: z.number(),
   appeal_count: z.number(),
+  decision_history: z.array(decisionRecordSchema),
   rule_snapshot: ruleSchema,
 });
 

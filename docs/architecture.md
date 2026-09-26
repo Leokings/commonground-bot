@@ -51,8 +51,16 @@ thresholds are deterministic and remain in the local rule engine.
     explicitly non-authoritative.
 12. After successful finalization, the bot performs the rule's predetermined
     Discord action and posts an audit record in the originating server.
-13. One appeal can trigger a fresh adjudication while preserving the original
-    ruling.
+13. The reported-message author or a Discord moderator can use the case's one
+    appeal. The bot rejects every other member, checks the persisted Discord
+    server binding, and the contract independently checks the supplied guild
+    key before it can consume the appeal.
+14. After either initial adjudication or appeal, the worker refetches the
+    finalized case, reconciles the exact decision revision with Discord, and
+    only then marks the operation complete. A changed appeal decision is
+    announced. Newly found violations apply the pinned action; overturned
+    violations withdraw the outcome, remove a recorded strike when applicable,
+    and clearly note that Discord cannot restore deleted content.
 
 ## Default-rule lifecycle
 
@@ -94,5 +102,8 @@ or multi-party rule changes without changing the moderation case model.
 - A message/rule pair has one deterministic case ID, so repeated member reports
   reuse the existing case instead of creating duplicate transactions.
 - Discord actions are idempotent by case ID and finalized decision revision.
+- Finalized revision and decision are persisted for both normal execution and
+  restart recovery before the transaction operation is marked complete.
+- Failed or cross-server appeals cannot consume a case's single appeal.
 - Contextual deletion happens only after a successful finalized transaction.
 - Cases retain the rule snapshot that was active when the case was opened.

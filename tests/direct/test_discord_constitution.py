@@ -6,6 +6,7 @@ import json
 CONTRACT = "contracts/discord_constitution.py"
 GENVM_VERSION = "v0.2.16"
 GUILD_KEY = "sha256:discord-guild-123"
+OTHER_GUILD_KEY = "sha256:discord-guild-456"
 PROMPT = r"(?s).*ROLE: COMMON_GROUND_DISCORD_RULE_REVIEWER.*"
 
 
@@ -280,7 +281,9 @@ def test_one_appeal_preserves_history(
         ),
     )
     appeal = contract.appeal_case(
-        "case-001", "The line was quoted from a fictional role-play scene."
+        GUILD_KEY,
+        "case-001",
+        "The line was quoted from a fictional role-play scene.",
     )
     assert appeal["decision"] == "allowed"
     assert appeal["kind"] == "appeal"
@@ -295,7 +298,41 @@ def test_one_appeal_preserves_history(
     ]
 
     with direct_vm.expect_revert("Only a decided case can be appealed"):
-        contract.appeal_case("case-001", "Try again")
+        contract.appeal_case(GUILD_KEY, "case-001", "Try again")
+
+
+def test_appeal_rejects_unauthorized_and_cross_guild_without_consuming_it(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    contract = deploy(direct_vm, direct_deploy, direct_alice)
+    register(contract, direct_vm, direct_alice)
+    add_contextual_rule(contract, direct_vm, direct_alice)
+    open_case(contract, direct_vm, direct_alice)
+    direct_vm.mock_llm(
+        PROMPT,
+        json.dumps({"decision": "violation", "analysis": "Targeted abuse."}),
+    )
+    direct_vm.sender = direct_alice
+    contract.adjudicate_case("case-001")
+
+    direct_vm.sender = direct_bob
+    with direct_vm.expect_revert("Only the service owner may write"):
+        contract.appeal_case(GUILD_KEY, "case-001", "Unauthorized appeal")
+
+    direct_vm.sender = direct_alice
+    contract.register_guild(OTHER_GUILD_KEY, "Other Discord Guild")
+    with direct_vm.expect_revert("Case does not belong to this guild"):
+        contract.appeal_case(OTHER_GUILD_KEY, "case-001", "Cross-guild appeal")
+
+    unchanged = contract.get_case("case-001")
+    assert unchanged["status"] == "decided"
+    assert unchanged["appeal_count"] == 0
+    assert unchanged["decision_revision"] == 1
+
+    contract.appeal_case(GUILD_KEY, "case-001", "Authorized appeal")
+    appealed = contract.get_case("case-001")
+    assert appealed["appeal_count"] == 1
+    assert appealed["decision_revision"] == 2
 
 
 def test_same_profanity_can_be_allowed_or_violate_based_on_context(

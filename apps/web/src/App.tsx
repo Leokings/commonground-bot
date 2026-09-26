@@ -7,22 +7,28 @@ const WalkthroughPlayer = lazy(() => import("./components/WalkthroughPlayer"));
 const CLIENT_ID = "1552600187556462652";
 const INSTALL_URL = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=76800&integration_type=0&scope=bot%20applications.commands`;
 const GITHUB_URL = "https://github.com/Leokings/commonground-bot";
-const CONTRACT_ADDRESS = "0xf8145e93E2Ab9Ea40bA39707A6Ae4b1663a88A90";
+const CONTRACT_ADDRESS = "0x01858Aad8C071fE3677588C6d3b107da47d879C8";
 const CONTRACT_URL = `https://explorer-studio.genlayer.com/address/${CONTRACT_ADDRESS}`;
 const HEALTH_URL =
   "https://p01--commonground-bot--2tgdv5n7tzkj.code.run/health";
 const EVIDENCE = [
   {
-    label: "Member report opened",
-    detail: "The reported Discord message and bounded context were written on-chain.",
-    hash: "0x71232b…4a248",
-    href: "https://explorer-studio.genlayer.com/tx/0x71232b8447b3f12f1d3c98c5a0c80b9bc1991c0b6979368510563be39894a248",
+    label: "Appeal case opened",
+    detail: "The reported message, pinned rule, and bounded context were written on-chain.",
+    hash: "0xf43ef1…bb5f9",
+    href: "https://explorer-studio.genlayer.com/tx/0xf43ef19fc38b14911db3e3b144c713fbdaa9c47fa49c9cdce9259e7cbfabb5f9",
   },
   {
-    label: "Decision finalized",
-    detail: "GenLayer validators returned an allowed decision for the positive-context test.",
-    hash: "0x28dd6e…f4edf",
-    href: "https://explorer-studio.genlayer.com/tx/0x28dd6e26d304fbfdc850a1f686c2c04f15e093e212c4bedbe2a57c96abbf4edf",
+    label: "Initial decision",
+    detail: "Validators finalized the original evidence as a violation at revision 1.",
+    hash: "0x150f67…437ce",
+    href: "https://explorer-studio.genlayer.com/tx/0x150f6703cd480895b320e05c9bd807232fc2ccdae76b3cd9579e2e88f05437ce",
+  },
+  {
+    label: "Appeal revised the result",
+    detail: "New context changed the finalized decision to allowed at revision 2.",
+    hash: "0x3c4386…ae180",
+    href: "https://explorer-studio.genlayer.com/tx/0x3c438624d8970ef677ba999c20568c8ab7781fc48e0546e9ec4969fd8b8ae180",
   },
 ] as const;
 
@@ -356,7 +362,7 @@ export function App() {
                 </ExternalLink>
               ))}
               <ExternalLink href={CONTRACT_URL} className="evidence-card contract-card">
-                <span className="evidence-index">03</span>
+                <span className="evidence-index">04</span>
                 <div>
                   <small>STUDIONET CONTRACT</small>
                   <h3>Read the state</h3>

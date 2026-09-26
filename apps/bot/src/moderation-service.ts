@@ -20,6 +20,8 @@ import type { BotConfig } from "./config.js";
 import type { ContractCase, ContractGateway } from "./contract-gateway.js";
 import { logger } from "./logger.js";
 import type {
+  CaseBinding,
+  FinalizedDecision,
   OperationKind,
   OperationStore,
   StoredOperation,
@@ -63,6 +65,16 @@ export interface ReportRuleSelection {
   kind: "enforce" | "review";
   rule: ConstitutionRule;
   detectorReason?: string;
+}
+
+export interface AppealRequester {
+  userId: string;
+  canModerate: boolean;
+}
+
+export interface AppealResult {
+  transactionHash: string;
+  case: ContractCase;
 }
 
 export function parseReplyReport(
@@ -315,8 +327,10 @@ export class ModerationService {
     return this.#cache.get(this.guildKey(guildId));
   }
 
-  async getCase(caseId: string): Promise<ContractCase> {
-    return this.gateway.getCase(caseId);
+  async getCase(guildId: string, caseId: string): Promise<ContractCase> {
+    const item = await this.gateway.getCase(caseId);
+    this.assertCaseGuild(item, guildId);
+    return item;
   }
 
   async handleMessage(message: Message): Promise<void> {
@@ -410,6 +424,7 @@ export class ModerationService {
     const opened = await this.openAndAdjudicateCase(
       message,
       selection.rule.rule_id,
+      selection.rule.action,
       reason,
     );
     return {
@@ -440,6 +455,7 @@ export class ModerationService {
   async openAndAdjudicateCase(
     message: Message,
     ruleId: string,
+    action: ConstitutionRule["action"],
     challengeReason: string,
   ): Promise<{ caseId: string; openTransactionHash: string }> {
     if (!message.guildId) throw new Error("Cases require a server message");
@@ -454,7 +470,8 @@ export class ModerationService {
       authorId: message.author.id,
       messageHash,
       ruleId,
-      action: "pending",
+      action,
+      finalizedRevision: 0,
     });
     const openHash = await this.submitWrite(
       "open_case",
@@ -481,18 +498,32 @@ export class ModerationService {
     guildId: string,
     caseId: string,
     appealReason: string,
-  ): Promise<string> {
+    requester: AppealRequester,
+  ): Promise<AppealResult> {
+    const binding = await this.store.getCaseBinding(caseId);
+    if (!binding || binding.guildId !== guildId) {
+      throw new Error("This case does not belong to this Discord server.");
+    }
+    if (binding.authorId !== requester.userId && !requester.canModerate) {
+      throw new Error(
+        "Only the author of the moderated message or a server moderator may appeal this case.",
+      );
+    }
+
+    const current = await this.gateway.getCase(caseId);
+    this.assertCaseGuild(current, guildId);
+    await this.applyFinalizedDecision(current);
+
+    const guildKey = this.guildKey(guildId);
     const hash = await this.submitWrite(
       "appeal_case",
       guildId,
       "appeal_case",
-      [caseId, appealReason],
+      [guildKey, caseId, appealReason],
       caseId,
     );
-    void this.finalize(hash).catch((error) =>
-      logger.error({ error, caseId, hash }, "appeal failed"),
-    );
-    return hash;
+    const finalized = await this.finalizeCaseOperation(hash, caseId);
+    return { transactionHash: hash, case: finalized };
   }
 
   private async completeCaseWorkflow(caseId: string, openHash: string): Promise<void> {
@@ -506,21 +537,93 @@ export class ModerationService {
       [caseId],
       caseId,
     );
-    await this.finalize(decisionHash);
+    await this.finalizeCaseOperation(decisionHash, caseId);
+  }
+
+  private assertCaseGuild(item: ContractCase, guildId: string): void {
+    if (item.guild_key !== this.guildKey(guildId)) {
+      throw new Error("This case does not belong to this Discord server.");
+    }
+  }
+
+  private async finalizeCaseOperation(
+    transactionHash: string,
+    caseId: string,
+  ): Promise<ContractCase> {
+    try {
+      await this.gateway.waitForSuccess(transactionHash);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await this.store.updateOperation(transactionHash, "failed", message);
+      throw error;
+    }
+
     const decided = await this.gateway.getCase(caseId);
     await this.applyFinalizedDecision(decided);
+    await this.store.updateOperation(transactionHash, "finalized");
+    return decided;
   }
 
   private async applyFinalizedDecision(decided: ContractCase): Promise<void> {
     const binding = await this.store.getCaseBinding(decided.case_id);
     if (!binding) throw new Error(`Missing Discord binding for ${decided.case_id}`);
-    if (decided.decision !== "violation") {
-      await this.#actions.log(
-        `**Case finalized**\nCase: \`${decided.case_id}\`\nDecision: \`${decided.decision}\`\n${decided.analysis}`,
-        binding.channelId,
-      );
-      return;
+    this.assertCaseGuild(decided, binding.guildId);
+    if (decided.decision === "pending" || decided.decision_revision < 1) {
+      throw new Error(`Case ${decided.case_id} has no finalized decision revision`);
     }
+
+    if (decided.decision_revision <= binding.finalizedRevision) return;
+
+    const priorHistory = decided.decision_history
+      .filter((record) => record.revision < decided.decision_revision)
+      .sort((left, right) => right.revision - left.revision)[0];
+    const previousDecision = binding.finalizedDecision ?? priorHistory?.decision;
+    const changed = Boolean(previousDecision && previousDecision !== decided.decision);
+    let repair = "";
+
+    if (decided.decision === "violation" && previousDecision !== "violation") {
+      repair = await this.applyViolationDecision(decided, binding);
+    } else if (changed && previousDecision === "violation") {
+      const strikeRetracted =
+        decided.rule_snapshot.action === "delete_and_strike"
+          ? await this.store.retractStrike(decided.case_id)
+          : false;
+      const deletedContentNotice = ["delete", "delete_and_warn", "delete_and_strike"].includes(
+        decided.rule_snapshot.action,
+      )
+        ? " Discord cannot restore content that was already deleted."
+        : "";
+      repair = `The previous violation outcome and its warning are withdrawn.${
+        strikeRetracted ? " The recorded strike was removed." : ""
+      }${deletedContentNotice}`;
+    }
+
+    const heading =
+      decided.status === "appealed"
+        ? changed
+          ? "**Appeal revised the decision**"
+          : "**Appeal finalized — decision unchanged**"
+        : "**Case finalized**";
+    const previousLine = previousDecision
+      ? `\nPrevious decision: \`${previousDecision}\``
+      : "";
+    await this.#actions.log(
+      `${heading}\nCase: \`${decided.case_id}\`\nRevision: \`${decided.decision_revision}\`${previousLine}\nDecision: \`${decided.decision}\`\n${decided.analysis}${
+        repair ? `\nRepair: ${repair}` : ""
+      }`,
+      binding.channelId,
+    );
+    await this.store.updateCaseFinalizedState(
+      decided.case_id,
+      decided.decision_revision,
+      decided.decision as FinalizedDecision,
+    );
+  }
+
+  private async applyViolationDecision(
+    decided: ContractCase,
+    binding: CaseBinding,
+  ): Promise<string> {
     const channel = await this.client.channels.fetch(binding.channelId);
     if (!channel?.isTextBased() || !("messages" in channel)) {
       throw new Error("Bound case channel is unavailable");
@@ -531,14 +634,14 @@ export class ModerationService {
         `Case \`${decided.case_id}\` finalized as a violation, but the source message was already unavailable.`,
         binding.channelId,
       );
-      return;
+      return "The configured action could not be applied because the source message was unavailable.";
     }
     if (hashMessageSnapshot(message.content) !== binding.messageHash) {
       await this.#actions.log(
         `Case \`${decided.case_id}\` finalized as a violation, but the message changed after the case opened. No automatic deletion was performed.`,
         binding.channelId,
       );
-      return;
+      return "The configured action was withheld because the message no longer matched the reviewed snapshot.";
     }
     await this.#actions.execute(
       message,
@@ -547,6 +650,7 @@ export class ModerationService {
       decided.case_id,
       decided.rule_id,
     );
+    return `The configured \`${decided.rule_snapshot.action}\` action was applied.`;
   }
 
   async resumePendingOperations(): Promise<void> {
@@ -574,21 +678,18 @@ export class ModerationService {
             [operation.caseId],
             operation.caseId,
           );
-          await this.finalize(hash);
-          await this.applyFinalizedDecision(await this.gateway.getCase(operation.caseId));
+          await this.finalizeCaseOperation(hash, operation.caseId);
+          continue;
+        }
+        if (
+          (operation.kind === "adjudicate_case" || operation.kind === "appeal_case") &&
+          operation.caseId
+        ) {
+          await this.finalizeCaseOperation(operation.transactionHash, operation.caseId);
           continue;
         }
         await this.finalize(operation.transactionHash);
-        if (operation.kind === "adjudicate_case" && operation.caseId) {
-          await this.applyFinalizedDecision(await this.gateway.getCase(operation.caseId));
-        } else if (operation.kind === "appeal_case" && operation.caseId) {
-          const decided = await this.gateway.getCase(operation.caseId);
-          const binding = await this.store.getCaseBinding(operation.caseId);
-          await this.#actions.log(
-            `**Appeal finalized**\nCase: \`${decided.case_id}\`\nDecision: \`${decided.decision}\`\n${decided.analysis}`,
-            binding?.channelId,
-          );
-        } else if (
+        if (
           operation.kind === "add_rule" ||
           operation.kind === "update_rule" ||
           operation.kind === "disable_rule"

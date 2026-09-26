@@ -29,10 +29,17 @@ describe("MemoryOperationStore", () => {
       messageHash: "sha256:message",
       ruleId: "respect",
       action: "delete_and_warn",
+      finalizedRevision: 0,
     };
     await store.saveCaseBinding(binding);
     await store.saveCaseBinding({ ...binding, action: "changed" });
     expect(await store.getCaseBinding("case-1")).toEqual(binding);
+
+    await store.updateCaseFinalizedState("case-1", 2, "allowed");
+    expect(await store.getCaseBinding("case-1")).toMatchObject({
+      finalizedRevision: 2,
+      finalizedDecision: "allowed",
+    });
   });
 
   it("counts strikes and does not double count one enforcement event", async () => {
@@ -41,6 +48,7 @@ describe("MemoryOperationStore", () => {
     expect(await store.recordStrike("event-1", "guild", "member", "respect")).toBe(1);
     expect(await store.recordStrike("event-2", "guild", "member", "spam")).toBe(2);
     expect(await store.recordStrike("event-3", "guild", "other", "spam")).toBe(1);
+    expect(await store.retractStrike("event-1")).toBe(true);
+    expect(await store.retractStrike("event-1")).toBe(false);
   });
 });
-

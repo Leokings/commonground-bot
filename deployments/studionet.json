@@ -1,27 +1,51 @@
 {
   "network": "studionet",
   "chain_id": 61999,
-  "contract_address": "0xf8145e93E2Ab9Ea40bA39707A6Ae4b1663a88A90",
-  "deployment_transaction": "0xef16c8551190023d6bf9427333901cbb3d1ec680a4a470969beb6ec7b3ffcc6b",
-  "demo_guild_key": "commonground-demo",
-  "transactions": {
-    "register_guild": "0x5dfff3f50ce4193cf41aa769a3089155df72b994f60ef9e318c99930f567591e",
-    "add_no_external_links": "0xd2b849a46d62894ff0afa2ccd471958f1c8c6fb893dfe84a0bbe345c6ea64554",
-    "add_no_targeted_abuse": "0x9525af8948927373616d441cdc1e31ff20ed856e337ba8b8d27020dbaedc32bb",
-    "add_flood_control": "0xc469e99af54b0c172b0515f24757310a72a1f8e6ece9a6fd3d11ca1db2530476",
-    "open_case": "0x71ea426d63403bf7dc1a6f0a8cb6ec38926d3bb52e26604e5b15a26006d587a5",
-    "submit_defense": "0x0e10297214b1f940570379637d19161a77872e656eb328f5409750f3a2861e5b",
-    "adjudicate_case": "0x2d07da160f6e6d998eef1103960c47a94da4300f494b7c2332f1e6cb2a49f14f"
+  "contract_address": "0x01858Aad8C071fE3677588C6d3b107da47d879C8",
+  "deployment_transaction": "0x00054cbbc97eced2172550d92eada348ead2d88a4c1be49896b855ab37b66b93",
+  "previous_contract_address": "0xf8145e93E2Ab9Ea40bA39707A6Ae4b1663a88A90",
+  "live_guild_key": "sha256:bf2bf0aca29766a23a40bde8478dfdcfccaa8355e1d2cbe660593f19fa9b4321",
+  "migration_transactions": {
+    "register_live_guild": "0x842303af7fb352a2cd409b62ab9c84cb785b4648b915a3f6a805b999162476de",
+    "add_no_unapproved_links": "0x2be26a41149940434796ed36c70a808f9ff7bd5933d17907a3a55a2feb72dd71",
+    "add_no_profanity": "0x4f504125912bc382397403a74863a34cf554027fd1e3aa6ddc522246fcc3a03b",
+    "add_no_targeted_abuse": "0xb402b84e6c16acd1f066da232da6eb76ee3bbb6c5d4d2a5b0022bd016f68de56",
+    "add_no_external_invites": "0x6ee67f072ab479b39027e018ed0358d6fa304cd1debfc3eac9f5845f9174b3e0",
+    "add_no_message_flooding": "0x62a4bbc95dd047e0a57ae28ff24b8ef3ec8e53c642ef93f9a79b93a69b9d1385",
+    "add_no_repeated_spam": "0x483239615db26b207257bb1c159f750680a4763596ca494872a1acb1b140d50c",
+    "add_no_mass_mentions": "0xc57e609996cdf4f0805fee36282a24308783d596faa7b4e71c05f502bd0e0a1f"
+  },
+  "reviewer_remediation": {
+    "cross_guild_proof": {
+      "case_id": "reviewer-appeal-20260926",
+      "register_other_guild": "0x547730f84636547e786b61f670999334518d16ba195c8716d87081bfd64b83a4",
+      "open_case": "0xc1a66aa1832b43b46edd81c2acfe4bb48eee985d10558f41c5d1477d97ad253f",
+      "adjudicate_case": "0xb02434e35d4ec05757d9e3adcbeb2696d05fa713bcf47eb9e997a2d7b17ad6d4",
+      "rejected_cross_guild_appeal": "0xe0c067e20956367c5a8fd7015e168827902d6f903f18fe60c3938d4f24873e4d",
+      "post_rejection_revision": 1,
+      "post_rejection_appeal_count": 0,
+      "authorized_appeal": "0x085cf3c24d148c7a4675e091153471eb2684da42faff6aeb388a35c2a4293f89"
+    },
+    "changed_decision_proof": {
+      "case_id": "reviewer-changed-appeal-20260926",
+      "open_case": "0xf43ef19fc38b14911db3e3b144c713fbdaa9c47fa49c9cdce9259e7cbfabb5f9",
+      "adjudicate_case": "0x150f6703cd480895b320e05c9bd807232fc2ccdae76b3cd9579e2e88f05437ce",
+      "appeal_case": "0x3c438624d8970ef677ba999c20568c8ab7781fc48e0546e9ec4969fd8b8ae180",
+      "initial_decision": "violation",
+      "final_decision": "allowed",
+      "final_revision": 2,
+      "appeal_count": 1
+    }
   },
   "expected_state": {
-    "guilds": 1,
-    "rules": 3,
-    "rule_versions": 3,
-    "cases": 1,
-    "decisions": 1,
-    "appeals": 0
+    "guilds": 2,
+    "rules": 7,
+    "rule_versions": 7,
+    "cases": 2,
+    "decisions": 4,
+    "appeals": 2
   },
-  "live_discord_verification": {
+  "previous_contract_live_discord_verification": {
     "verified_at": "2026-09-24",
     "health_url": "https://p01--commonground-bot--2tgdv5n7tzkj.code.run/health",
     "guild_key": "sha256:bf2bf0aca29766a23a40bde8478dfdcfccaa8355e1d2cbe660593f19fa9b4321",

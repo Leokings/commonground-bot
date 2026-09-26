@@ -16,12 +16,12 @@ The first working milestone now includes:
 - reply-and-mention, slash-command, and message-action reporting for every member;
 - automatic rule selection with no rule ID required from the reporter;
 - deterministic local checks only after a report;
-- GenLayer-backed contextual adjudication and one appeal;
+- GenLayer-backed contextual adjudication and one authorized, server-bound appeal;
 - a case explorer with transaction links.
 
 ## Live Studio Network deployment
 
-- Contract: `0xf8145e93E2Ab9Ea40bA39707A6Ae4b1663a88A90`
+- Contract: `0x01858Aad8C071fE3677588C6d3b107da47d879C8`
 - Public app: <https://commonground-bot.vercel.app>
 - Install in Discord: <https://discord.com/oauth2/authorize?client_id=1552600187556462652&permissions=76800&integration_type=0&scope=bot%20applications.commands>
 - Hosted bot health: <https://p01--commonground-bot--2tgdv5n7tzkj.code.run/health>
@@ -80,7 +80,8 @@ a Docker deployment, and optional PostgreSQL-backed restart recovery. See
 - `/rule edit-rule` creates a new version of an existing rule.
 - `/rule list` reads the finalized active rules.
 - `/rule disable-rule` disables an active rule.
-- `/case status` and `/case appeal` manage moderation cases.
+- `/case status` reads cases only from the current server. `/case appeal` is
+  available only to the reported-message author or a server moderator.
 - Reply to a message with `@CommonGround report` for the simplest member flow.
 - `/report message-link:<link>` reports a copied Discord message link.
 - `Apps → Report to CommonGround` is an alternative one-click message action.

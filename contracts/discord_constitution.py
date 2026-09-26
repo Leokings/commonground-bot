@@ -620,9 +620,14 @@ class DiscordRules(gl.Contract):
         return decision_record
 
     @gl.public.write
-    def appeal_case(self, case_id: str, appeal_reason: str) -> dict:
+    def appeal_case(self, guild_key: str, case_id: str, appeal_reason: str) -> dict:
         self._only_owner()
+        guild = self._guild(guild_key)
         case = self._case(case_id)
+        if case["guild_key"] != guild["guild_key"]:
+            raise gl.vm.UserError(
+                f"{ERROR_EXPECTED} Case does not belong to this guild"
+            )
         if case["status"] != CASE_DECIDED:
             raise gl.vm.UserError(f"{ERROR_EXPECTED} Only a decided case can be appealed")
         if not case["rule_snapshot"]["appeal_allowed"]:
