@@ -1,5 +1,5 @@
 import { DEFAULT_RULES, type ConstitutionRule } from "@commonground/core";
-import { Collection, type Client, type Message } from "discord.js";
+import { ChannelType, Collection, type Client, type Message } from "discord.js";
 import { describe, expect, it } from "vitest";
 
 import type { BotConfig } from "./config.js";
@@ -10,6 +10,7 @@ import type {
 } from "./contract-gateway.js";
 import {
   ModerationService,
+  isPublicReportMessage,
   parseReplyReport,
   selectRuleForReport,
 } from "./moderation-service.js";
@@ -77,6 +78,18 @@ function service(gateway: RecordingGateway): ModerationService {
     gateway,
     new MemoryOperationStore(),
   );
+}
+
+function connectedTestClient(): Client {
+  return {
+    user: { id: "bot-1" },
+    channels: {
+      fetch: async () => ({
+        isTextBased: () => true,
+        send: async () => undefined,
+      }),
+    },
+  } as unknown as Client;
 }
 
 function storedRule(ruleId: string): ConstitutionRule {
@@ -193,11 +206,84 @@ describe("member-driven reports", () => {
     expect(gateway.writes).toEqual([]);
   });
 
+  it("accepts only channels visible to the whole server", () => {
+    const base = {
+      guildId: "guild-1",
+      guild: { roles: { everyone: { id: "guild-1" } } },
+      inGuild: () => true,
+    };
+    const publicMessage = {
+      ...base,
+      channel: {
+        type: ChannelType.GuildText,
+        permissionsFor: () => ({ has: () => true }),
+      },
+    } as unknown as Message;
+    const privateMessage = {
+      ...base,
+      channel: {
+        type: ChannelType.PrivateThread,
+        permissionsFor: () => ({ has: () => true }),
+      },
+    } as unknown as Message;
+    const hiddenMessage = {
+      ...base,
+      channel: {
+        type: ChannelType.GuildText,
+        permissionsFor: () => ({ has: () => false }),
+      },
+    } as unknown as Message;
+
+    expect(isPublicReportMessage(publicMessage)).toBe(true);
+    expect(isPublicReportMessage(privateMessage)).toBe(false);
+    expect(isPublicReportMessage(hiddenMessage)).toBe(false);
+  });
+
+  it("does not apply the demo guild allowlist to another installed server", async () => {
+    const gateway = new RecordingGateway();
+    gateway.rules = rules;
+    const bot = new ModerationService(
+      connectedTestClient(),
+      {
+        ...config,
+        discordTestGuildId: "demo-guild",
+        monitoredChannelIds: new Set(["demo-channel"]),
+      },
+      gateway,
+      new MemoryOperationStore(),
+    );
+    const target = {
+      id: "external-message",
+      guildId: "external-guild",
+      channelId: "external-public-channel",
+      guild: { roles: { everyone: { id: "external-guild" } } },
+      inGuild: () => true,
+      author: { id: "external-member", bot: false },
+      content: "You are fucking stupid.",
+      createdTimestamp: 1_000,
+      mentions: { users: new Collection(), everyone: false },
+      channel: {
+        type: ChannelType.GuildText,
+        permissionsFor: () => ({ has: () => true }),
+        messages: {
+          fetch: async () => new Collection(),
+        },
+      },
+    } as unknown as Message;
+
+    const result = await bot.reviewReportedMessage(target, "Please review this.");
+
+    expect(result.kind).toBe("submitted");
+    expect(gateway.writes.some((write) => write.functionName === "open_case")).toBe(
+      true,
+    );
+  });
+
   it("always includes the replied-to message and labeled nearby context", async () => {
     const gateway = new RecordingGateway();
     gateway.rules = rules;
     const bot = new ModerationService(
-      { user: { id: "bot-1" } } as Client,
+      connectedTestClient(),
       config,
       gateway,
       new MemoryOperationStore(),
@@ -207,12 +293,15 @@ describe("member-driven reports", () => {
       authorId: string,
       content: string,
       createdTimestamp: number,
+      bot = false,
     ) =>
       ({
         id,
         guildId: "guild-1",
         channelId: "channel-1",
-        author: { id: authorId, bot: false },
+        guild: { roles: { everyone: { id: "guild-1" } } },
+        inGuild: () => true,
+        author: { id: authorId, bot },
         content,
         createdTimestamp,
         mentions: { users: new Collection(), everyone: false },
@@ -224,6 +313,13 @@ describe("member-driven reports", () => {
       500,
     );
     const nearby = makeMessage("nearby-1", "member-3", "Nice work!", 700);
+    const noisyBot = makeMessage(
+      "bot-noise-1",
+      "another-bot",
+      "Unrelated automation result.",
+      800,
+      true,
+    );
     const reportCommand = {
       ...makeMessage("report-1", "member-4", "<@bot-1> report", 1_100),
       mentions: { users: new Collection([["bot-1", {} as never]]), everyone: false },
@@ -233,6 +329,8 @@ describe("member-driven reports", () => {
       reference: { messageId: "parent-1" },
       fetchReference: async () => parent,
       channel: {
+        type: ChannelType.GuildText,
+        permissionsFor: () => ({ has: () => true }),
         messages: {
           fetch: async (options: { before?: string; after?: string }) =>
             options.after
@@ -242,6 +340,7 @@ describe("member-driven reports", () => {
               : new Collection([
                   [parent.id, parent],
                   [nearby.id, nearby],
+                  [noisyBot.id, noisyBot],
                 ]),
         },
       },
@@ -256,5 +355,6 @@ describe("member-driven reports", () => {
     );
     expect(openCase?.args[5]).toContain("before [member-2]: Nice work!");
     expect(openCase?.args[5]).not.toContain("<@bot-1> report");
+    expect(openCase?.args[5]).not.toContain("Unrelated automation result");
   });
 });

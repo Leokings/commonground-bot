@@ -108,7 +108,7 @@ execution, shared moderation logic, Discord commands, and the production build:
 
 - 9 direct intelligent-contract tests
 - 9 shared core tests
-- 31 Discord-bot tests
+- 38 Discord-bot tests
 - TypeScript type-check and production build
 
 Run `npm run verify` from the repository root. The context regression explicitly
@@ -119,5 +119,5 @@ The report-driven release was deployed on 24 September 2026 as Northflank pod
 logged `CommonGround bot is ready`, the public health endpoint returned
 `ready: true`, and Discord accepted all four current command definitions.
 
-The owner-private live dashboard is available at
-[`commonground-constitution.plain3rd.chatgpt.site`](https://commonground-constitution.plain3rd.chatgpt.site).
+The public reviewer app is available at
+[`commonground-bot.vercel.app`](https://commonground-bot.vercel.app).

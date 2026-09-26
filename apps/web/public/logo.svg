@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">CommonGround logo</title>
+  <rect width="128" height="128" rx="32" fill="#6c4bf4"/>
+  <path d="M27 31h74v50a15 15 0 0 1-15 15H62l-18 15V96h-2A15 15 0 0 1 27 81V31Z" fill="#fff7e8" stroke="#14233b" stroke-width="7" stroke-linejoin="round"/>
+  <circle cx="50" cy="63" r="7" fill="#ff6d5a"/>
+  <circle cx="78" cy="63" r="7" fill="#54d6a5"/>
+</svg>

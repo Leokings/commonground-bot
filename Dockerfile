@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY apps/bot/package.json apps/bot/package.json
+COPY apps/web/package.json apps/web/package.json
 COPY packages/core/package.json packages/core/package.json
 
 RUN npm ci \
@@ -19,6 +20,8 @@ RUN npm run build -w @commonground/core \
 
 ENV NODE_ENV=production
 ENV PORT=8080
+ARG APP_RELEASE=development
+ENV APP_RELEASE=$APP_RELEASE
 
 EXPOSE 8080
 

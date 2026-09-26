@@ -3,6 +3,8 @@ import { createServer, type Server } from "node:http";
 export interface HealthSnapshot {
   ready: boolean;
   network: string;
+  contractAddress: string;
+  release: string;
 }
 
 export function startHealthServer(
@@ -18,6 +20,7 @@ export function startHealthServer(
 
     response.setHeader("content-type", "application/json; charset=utf-8");
     response.setHeader("cache-control", "no-store");
+    response.setHeader("access-control-allow-origin", "*");
 
     if (request.method !== "GET") {
       response.statusCode = 405;

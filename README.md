@@ -22,13 +22,16 @@ The first working milestone now includes:
 ## Live Studio Network deployment
 
 - Contract: `0xf8145e93E2Ab9Ea40bA39707A6Ae4b1663a88A90`
-- Dashboard: `https://commonground-constitution.plain3rd.chatgpt.site`
+- Public app: <https://commonground-bot.vercel.app>
+- Install in Discord: <https://discord.com/oauth2/authorize?client_id=1552600187556462652&permissions=76800&integration_type=0&scope=bot%20applications.commands>
+- Hosted bot health: <https://p01--commonground-bot--2tgdv5n7tzkj.code.run/health>
 - Network: GenLayer Studio Network (`61999`)
 - Live state: seven active rules and multiple version-pinned decisions
 
-The dashboard is currently owner-private and reads the finalized contract state
-at request time. See [`docs/live-verification.md`](docs/live-verification.md) for
-the deployment and lifecycle transaction links.
+The public reviewer app includes the normal first-time flow, a Remotion product
+walkthrough, a context-routing demo, and direct explorer evidence. See
+[`docs/reviewer-guide.md`](docs/reviewer-guide.md) for the shortest live test and
+[`docs/live-verification.md`](docs/live-verification.md) for lifecycle links.
 
 See [`docs/architecture.md`](docs/architecture.md) for the trust boundary and
 end-to-end flow.
@@ -39,12 +42,13 @@ end-to-end flow.
 contracts/       GenLayer Intelligent Contract
 tests/direct/    fast contract tests
 apps/bot/        Discord bot and transaction worker
+apps/web/        public reviewer app, Canvas visual, and Remotion walkthrough
 packages/core/   shared rule engine and schemas
 docs/            architecture, setup, and operations
 ```
 
-The reviewer dashboard is deployed separately from the always-on bot so each
-surface can use the hosting model that fits it best.
+The reviewer app is deployed separately from the always-on bot so each surface
+can use the hosting model that fits it best.
 
 ## Security
 
@@ -54,12 +58,11 @@ Copy `.env.example` to `.env` locally and populate secrets there.
 ## Verification
 
 ```powershell
-npm test
-npm run typecheck
-npm run build
-python -m pytest -q tests/direct
-genvm-lint check contracts/discord_constitution.py --json
+npm run verify
 ```
+
+The same complete verification now runs in GitHub Actions before any container
+image is published.
 
 The Discord integration can be exercised locally; a separate bot host is only
 needed for continuous 24/7 operation.
@@ -85,10 +88,16 @@ a Docker deployment, and optional PostgreSQL-backed restart recovery. See
 All three report paths choose the relevant active rule automatically. Ordinary,
 unreported messages are ignored and produce no GenLayer transaction.
 
+Reports are accepted only from channels visible to the server's `@everyone`
+role. Private channels and private threads are rejected before any content can
+be sent to GenLayer. A local allowlist can further restrict the configured test
+server without blocking installations in other servers.
+
 For contextual reviews, GenLayer receives the exact reported message plus a
 bounded conversation snapshot. A Discord reply always includes its replied-to
 message explicitly, along with nearby messages before and after it. Speaker IDs
 are replaced with temporary labels such as `reported-author` and `member-1`.
+Nearby bot output and the report command itself are excluded from that snapshot.
 
 The starter pack and its context examples are documented in
 [`docs/default-rule-pack.md`](docs/default-rule-pack.md).

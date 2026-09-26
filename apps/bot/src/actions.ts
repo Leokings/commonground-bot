@@ -56,18 +56,19 @@ export class DiscordActionExecutor {
       `**CommonGround enforcement**\n${reason}\nAction: \`${action}\`${
         caseId ? `\nCase: \`${caseId}\`` : ""
       }${strikeLine}`,
+      message.channelId,
     );
   }
 
-  async log(content: string): Promise<void> {
-    const channelId = this.config.discordModLogChannelId;
+  async log(content: string, sourceChannelId?: string): Promise<void> {
+    const channelId = sourceChannelId ?? this.config.discordModLogChannelId;
     if (!channelId) {
       logger.info({ content }, "moderation log channel is not configured");
       return;
     }
     const channel = await this.client.channels.fetch(channelId);
     if (!channel?.isTextBased() || !("send" in channel)) {
-      throw new Error("Configured moderation log channel is not text based");
+      throw new Error("Moderation log channel is not text based");
     }
     await channel.send({ content });
   }

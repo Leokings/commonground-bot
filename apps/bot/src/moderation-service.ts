@@ -8,7 +8,12 @@ import {
   type EditableRuleInput,
   type MessageSample,
 } from "@commonground/core";
-import type { Client, Message } from "discord.js";
+import {
+  ChannelType,
+  PermissionFlagsBits,
+  type Client,
+  type Message,
+} from "discord.js";
 
 import { DiscordActionExecutor } from "./actions.js";
 import type { BotConfig } from "./config.js";
@@ -123,6 +128,16 @@ export function selectRuleForReport(
 
   const hybrid = activeRules.find((rule) => rule.mode === "hybrid");
   return hybrid ? { kind: "review", rule: hybrid } : null;
+}
+
+export function isPublicReportMessage(message: Message): boolean {
+  if (!message.inGuild()) return false;
+  if (message.channel.type === ChannelType.PrivateThread) return false;
+  return Boolean(
+    message.channel
+      .permissionsFor(message.guild.roles.everyone)
+      ?.has(PermissionFlagsBits.ViewChannel),
+  );
 }
 
 export class ModerationService {
@@ -336,8 +351,14 @@ export class ModerationService {
     challengeReason: string,
   ): Promise<ReportReviewResult> {
     if (!message.guildId) throw new Error("Reports require a server message");
+    if (!isPublicReportMessage(message)) {
+      return { kind: "channel_not_configured", checkedRules: 0 };
+    }
+    const appliesTestGuildAllowlist =
+      this.config.discordTestGuildId === message.guildId &&
+      this.config.monitoredChannelIds.size > 0;
     if (
-      this.config.monitoredChannelIds.size > 0 &&
+      appliesTestGuildAllowlist &&
       !this.config.monitoredChannelIds.has(message.channelId)
     ) {
       return { kind: "channel_not_configured", checkedRules: 0 };
@@ -496,6 +517,7 @@ export class ModerationService {
     if (decided.decision !== "violation") {
       await this.#actions.log(
         `**Case finalized**\nCase: \`${decided.case_id}\`\nDecision: \`${decided.decision}\`\n${decided.analysis}`,
+        binding.channelId,
       );
       return;
     }
@@ -507,12 +529,14 @@ export class ModerationService {
     if (!message) {
       await this.#actions.log(
         `Case \`${decided.case_id}\` finalized as a violation, but the source message was already unavailable.`,
+        binding.channelId,
       );
       return;
     }
     if (hashMessageSnapshot(message.content) !== binding.messageHash) {
       await this.#actions.log(
         `Case \`${decided.case_id}\` finalized as a violation, but the message changed after the case opened. No automatic deletion was performed.`,
+        binding.channelId,
       );
       return;
     }
@@ -559,8 +583,10 @@ export class ModerationService {
           await this.applyFinalizedDecision(await this.gateway.getCase(operation.caseId));
         } else if (operation.kind === "appeal_case" && operation.caseId) {
           const decided = await this.gateway.getCase(operation.caseId);
+          const binding = await this.store.getCaseBinding(operation.caseId);
           await this.#actions.log(
             `**Appeal finalized**\nCase: \`${decided.case_id}\`\nDecision: \`${decided.decision}\`\n${decided.analysis}`,
+            binding?.channelId,
           );
         } else if (
           operation.kind === "add_rule" ||
@@ -624,12 +650,17 @@ export class ModerationService {
     const parentId = replyParent?.id;
     const before = preceding
       ? Array.from(preceding.values())
-          .filter((item) => item.id !== parentId && !isReportCommand(item))
+          .filter(
+            (item) =>
+              item.id !== parentId &&
+              !item.author.bot &&
+              !isReportCommand(item),
+          )
           .sort((a, b) => a.createdTimestamp - b.createdTimestamp)
       : [];
     const after = following
       ? Array.from(following.values())
-          .filter((item) => !isReportCommand(item))
+          .filter((item) => !item.author.bot && !isReportCommand(item))
           .sort((a, b) => a.createdTimestamp - b.createdTimestamp)
       : [];
     context.push(...before.map((item) => line("before", item)));

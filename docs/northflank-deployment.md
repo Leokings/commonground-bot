@@ -42,8 +42,10 @@ Verified on 24 September 2026:
 - Health path: `/health`
 - Start command: provided by the Dockerfile
 
-The root endpoint returns public service readiness only. It never returns the
-Discord token, signing key, guild identifiers, or database credentials.
+The root endpoint returns public service readiness, network, contract address,
+and image release only. It never returns the Discord token, signing key, guild
+identifiers, or database credentials. CORS is enabled because the public app
+uses this non-secret endpoint for its live status badge.
 
 ## Required variables
 
@@ -51,9 +53,10 @@ Configure these as Northflank secrets rather than committing them:
 
 - `DISCORD_BOT_TOKEN`
 - `DISCORD_CLIENT_ID`
-- `DISCORD_TEST_GUILD_ID`
+- `DISCORD_TEST_GUILD_ID` (optional; enables demo-server allowlist scoping)
+- `DISCORD_COMMAND_SCOPE=global` (used by the registration script)
 - `DISCORD_MOD_LOG_CHANNEL_ID`
-- `DISCORD_MONITORED_CHANNEL_IDS`
+- `DISCORD_MONITORED_CHANNEL_IDS` (optional; applies only to the test guild)
 - `GENLAYER_PRIVATE_KEY`
 - `GENLAYER_NETWORK=studionet`
 - `GENLAYER_CONTRACT_ADDRESS`

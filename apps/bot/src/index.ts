@@ -25,6 +25,8 @@ const moderation = new ModerationService(client, config, gateway, store);
 const healthServer = await startHealthServer(config.port, () => ({
   ready: client.isReady(),
   network: config.genlayerNetwork,
+  contractAddress: config.genlayerContractAddress,
+  release: process.env.APP_RELEASE ?? "development",
 }));
 logger.info({ port: config.port }, "health endpoint is listening");
 

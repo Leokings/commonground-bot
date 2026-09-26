@@ -17,6 +17,26 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install project dependencies
+        run: |
+          npm ci
+          python -m pip install -r requirements.txt
+
+      - name: Verify contracts, bot, and reviewer site
+        run: npm run verify
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -32,6 +52,8 @@ jobs:
         with:
           context: .
           push: true
+          build-args: |
+            APP_RELEASE=${{ github.sha }}
           tags: |
             ghcr.io/leokings/commonground-bot:latest
             ghcr.io/leokings/commonground-bot:${{ github.sha }}

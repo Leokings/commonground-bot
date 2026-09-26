@@ -82,6 +82,44 @@ describe("bot configuration", () => {
       discordToken: "test-token",
       discordClientId: "123456789",
       discordTestGuildId: "987654321",
+      commandScope: "global",
     });
+  });
+
+  it("supports an explicit test-guild registration scope", () => {
+    const config = loadCommandRegistrationConfig({
+      DISCORD_BOT_TOKEN: "test-token",
+      DISCORD_CLIENT_ID: "123456789",
+      DISCORD_TEST_GUILD_ID: "987654321",
+      DISCORD_COMMAND_SCOPE: "guild",
+    });
+
+    expect(config.commandScope).toBe("guild");
+    expect(config.discordTestGuildId).toBe("987654321");
+  });
+
+  it("does not require a test guild for global registration or runtime", () => {
+    const registration = loadCommandRegistrationConfig({
+      DISCORD_BOT_TOKEN: "test-token",
+      DISCORD_CLIENT_ID: "123456789",
+    });
+    const runtime = loadConfig({
+      ...validEnvironment,
+      DISCORD_TEST_GUILD_ID: "",
+    });
+
+    expect(registration.commandScope).toBe("global");
+    expect(registration.discordTestGuildId).toBeUndefined();
+    expect(runtime.discordTestGuildId).toBeUndefined();
+  });
+
+  it("requires a test guild when guild-only registration is selected", () => {
+    expect(() =>
+      loadCommandRegistrationConfig({
+        DISCORD_BOT_TOKEN: "test-token",
+        DISCORD_CLIENT_ID: "123456789",
+        DISCORD_COMMAND_SCOPE: "guild",
+      }),
+    ).toThrow(/DISCORD_TEST_GUILD_ID|test guild/i);
   });
 });

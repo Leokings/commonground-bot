@@ -23,6 +23,8 @@ describe("health server", () => {
     const server = await startHealthServer(0, () => ({
       ready,
       network: "studionet",
+      contractAddress: `0x${"22".repeat(20)}`,
+      release: "test-release",
     }));
     servers.push(server);
     const port = (server.address() as AddressInfo).port;
@@ -33,7 +35,10 @@ describe("health server", () => {
       service: "commonground-bot",
       ready: false,
       network: "studionet",
+      contractAddress: `0x${"22".repeat(20)}`,
+      release: "test-release",
     });
+    expect(starting.headers.get("access-control-allow-origin")).toBe("*");
 
     ready = true;
     const healthy = await fetch(`http://127.0.0.1:${port}/health`);

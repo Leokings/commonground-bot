@@ -17,7 +17,7 @@ const optionalUrl = z.preprocess(
 const configSchema = z.object({
   DISCORD_BOT_TOKEN: z.string().min(1),
   DISCORD_CLIENT_ID: z.string().regex(/^\d+$/),
-  DISCORD_TEST_GUILD_ID: z.string().regex(/^\d+$/),
+  DISCORD_TEST_GUILD_ID: optionalDiscordId,
   DISCORD_MOD_LOG_CHANNEL_ID: optionalDiscordId,
   DISCORD_MONITORED_CHANNEL_IDS: z.string().default(""),
   GENLAYER_PRIVATE_KEY: privateKey,
@@ -36,11 +36,22 @@ const configSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65_535).default(8_080),
 });
 
-const commandRegistrationConfigSchema = z.object({
-  DISCORD_BOT_TOKEN: z.string().min(1),
-  DISCORD_CLIENT_ID: z.string().regex(/^\d+$/),
-  DISCORD_TEST_GUILD_ID: z.string().regex(/^\d+$/),
-});
+const commandRegistrationConfigSchema = z
+  .object({
+    DISCORD_BOT_TOKEN: z.string().min(1),
+    DISCORD_CLIENT_ID: z.string().regex(/^\d+$/),
+    DISCORD_TEST_GUILD_ID: optionalDiscordId,
+    DISCORD_COMMAND_SCOPE: z.enum(["global", "guild"]).default("global"),
+  })
+  .superRefine((value, context) => {
+    if (value.DISCORD_COMMAND_SCOPE === "guild" && !value.DISCORD_TEST_GUILD_ID) {
+      context.addIssue({
+        code: "custom",
+        path: ["DISCORD_TEST_GUILD_ID"],
+        message: "is required when DISCORD_COMMAND_SCOPE is guild",
+      });
+    }
+  });
 
 export type BotConfig = ReturnType<typeof loadConfig>;
 export type CommandRegistrationConfig = ReturnType<
@@ -55,6 +66,7 @@ export function loadCommandRegistrationConfig(
     discordToken: parsed.DISCORD_BOT_TOKEN,
     discordClientId: parsed.DISCORD_CLIENT_ID,
     discordTestGuildId: parsed.DISCORD_TEST_GUILD_ID,
+    commandScope: parsed.DISCORD_COMMAND_SCOPE,
   };
 }
 
