@@ -4,13 +4,17 @@ import json
 
 
 CONTRACT = "contracts/discord_constitution.py"
+GENVM_VERSION = "v0.2.16"
 GUILD_KEY = "sha256:discord-guild-123"
 PROMPT = r"(?s).*ROLE: COMMON_GROUND_DISCORD_RULE_REVIEWER.*"
 
 
 def deploy(direct_vm, direct_deploy, owner):
     direct_vm.sender = owner
-    return direct_deploy(CONTRACT)
+    # Keep direct tests on the runtime used by the deployed contract. The
+    # test runner otherwise follows GitHub's latest tag, which can be a
+    # pre-release with a differently named artifact bundle.
+    return direct_deploy(CONTRACT, sdk_version=GENVM_VERSION)
 
 
 def register(contract, direct_vm, owner):
