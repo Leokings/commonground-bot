@@ -153,4 +153,20 @@ describe("v2 durable moderation workflow", () => {
     expect(f.write).not.toHaveBeenCalled();
     expect(await f.store.pendingCases()).toHaveLength(1);
   });
+
+  it("announces the response deadline once and exposes it through case status", async () => {
+    const f = await fixture();
+    await f.bot.resumePendingOperations();
+    await f.bot.resumePendingOperations();
+    expect(f.send).toHaveBeenCalledOnce();
+    expect(await f.bot.caseProgress("guild-1", caseId)).toMatchObject({ defenseDeadline: f.item.defense_deadline });
+  });
+
+  it("distinguishes a missing public case from an RPC outage", async () => {
+    const f = await fixture();
+    vi.mocked(f.gateway.getCase).mockRejectedValueOnce(new Error("gen_call failed: [EXPECTED] Case does not exist"));
+    expect(await f.bot.publicCase(caseId)).toBeNull();
+    vi.mocked(f.gateway.getCase).mockRejectedValueOnce(new Error("RPC temporarily unavailable"));
+    await expect(f.bot.publicCase(caseId)).rejects.toThrow("RPC temporarily unavailable");
+  });
 });

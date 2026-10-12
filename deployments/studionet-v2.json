@@ -1,0 +1,24 @@
+{
+  "network": "studionet",
+  "chain_id": 61999,
+  "protocol": 2,
+  "registry_address": "0x58D98ffb1f181B5ea93EC3E7afbc7941834f96AD",
+  "court_address": "0x461ea2fbA9339F099c38eF4A0c910011EAcC8483",
+  "ledger_address": "0x6bA7eD094Cc2Bd035BDb8996b7D7D6C9bC7AACb9",
+  "legacy_address": "0x01858Aad8C071fE3677588C6d3b107da47d879C8",
+  "relayer_address": "0x797d3B25fB2cCA0Ff93F60df1910267f3822D655",
+  "test_guild_admin_address": "0x87e94EDAb4418e8A9eA37c0FAb0675Cf0602A9F2",
+  "admin_cli_account": "grounding-bradbury",
+  "source_hashes": {
+    "CommunityRegistry": "sha256:d5a1637e552614011be2ae678bc7c4ee7018ddf07ad27d4e75952d46c9644705",
+    "CaseCourt": "sha256:c692c2bcde17c49bb123d21d9fd2d10a461e47bf4d738aa860cc739995dd1a6b",
+    "EnforcementLedger": "sha256:7be0d57769e33b583781ce9cb2700846d69fc171f9a7ed7d729cc5b16113dc4a"
+  },
+  "transactions": {
+    "deploy_registry": "0xe0f049106efba5d08a1628bea7a4549588d901fa463c2aa6588b0ec6e68d34d9",
+    "deploy_court": "0xf7a0c4727736563a70a7af0fd1177d7da9451a0f545fef0d9c385bbbd6688a60",
+    "deploy_ledger": "0xd1217e8539d9bc139f424df1afe3b5c2fe68fd3e2a73a1d43289e57aa33f2481",
+    "bind_court": "0xc19244b9372a6c2e8df7a7e9bf6b1b71b2a18d8670e83a4c1052447a9b6a14a8",
+    "register_test_guild": "0x9f0aebe3ffebb4756030a6b0e4f84f6f215502fce8460eaa39cba129cace361e"
+  }
+}

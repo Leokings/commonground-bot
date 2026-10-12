@@ -12,7 +12,7 @@ import { keccak256, parseEventLogs } from "viem";
 
 import type { BotConfig } from "./config.js";
 import { logger } from "./logger.js";
-import { FinalizedExecutionError, inspectReceiptExecution } from "./transaction.js";
+import { FinalizedExecutionError, hasFinalizedStatus, inspectReceiptExecution } from "./transaction.js";
 import type { BroadcastRecord } from "./operation-store.js";
 import { contractAddressArgument } from "./calldata-address.js";
 
@@ -178,8 +178,11 @@ export function createContractGateway(config: BotConfig): ContractGateway {
         }
       }
       if (config.registryAddress && functionName === "adjudicate_case") {
-        const item = await read("get_case", [args[0]!]) as { decision_revision: number };
-        callArgs.push(item.decision_revision);
+        if (!isV2Case(args[0])) address = legacy;
+        else {
+          const item = await read("get_case", [args[0]!]) as { decision_revision: number };
+          callArgs.push(item.decision_revision);
+        }
       }
       if (config.registryAddress && functionName === "appeal_case") {
         if (!isV2Case(args[1])) address = legacy;
@@ -242,7 +245,7 @@ export function createContractGateway(config: BotConfig): ContractGateway {
     },
     async isFinalizedSuccess(hash) {
       const receipt = await client.getTransaction({ hash: hash as Hash });
-      if (String(receipt.status).toUpperCase() !== "FINALIZED" && String((receipt as unknown as { status_name?: string }).status_name).toUpperCase() !== "FINALIZED") return false;
+      if (!hasFinalizedStatus(receipt)) return false;
       const execution = inspectReceiptExecution(receipt);
       if (execution.outcome === "failure") throw new FinalizedExecutionError(execution.detail ?? "Finalized execution failed");
       return execution.outcome === "success";

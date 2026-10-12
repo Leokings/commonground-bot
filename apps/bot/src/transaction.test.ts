@@ -1,8 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { inspectReceiptExecution } from "./transaction.js";
+import { hasFinalizedStatus, inspectReceiptExecution } from "./transaction.js";
 
 describe("inspectReceiptExecution", () => {
+  it("recognizes the actual StudioNet SDK finality fields without treating accepted as finalized", () => {
+    expect(hasFinalizedStatus({ status: 7, statusName: "FINALIZED" })).toBe(true);
+    expect(hasFinalizedStatus({ status_name: "FINALIZED" })).toBe(true);
+    expect(hasFinalizedStatus({ status: "FINALIZED" })).toBe(true);
+    expect(hasFinalizedStatus({ status: 7 })).toBe(true);
+    expect(hasFinalizedStatus({ status: 6, statusName: "ACCEPTED" })).toBe(false);
+  });
+
+  it("keeps conflicting execution receipts unresolved instead of trusting any success", () => {
+    expect(inspectReceiptExecution({ consensus_data: { leader_receipt: [
+      { execution_result: "SUCCESS" }, { execution_result: "ERROR" },
+    ] }}).outcome).toBe("unknown");
+    expect(inspectReceiptExecution({ consensus_data: { leader_receipt: [
+      { execution_result: "ERROR", result: { status: "rollback", payload: "[EXPECTED] Permission denied" } },
+    ] }})).toEqual({ outcome: "failure", detail: "[EXPECTED] Permission denied" });
+  });
   it("recognizes top-level successful execution", () => {
     expect(
       inspectReceiptExecution({ txExecutionResultName: "FINISHED_WITH_RETURN" }),

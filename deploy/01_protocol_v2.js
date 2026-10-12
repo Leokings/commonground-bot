@@ -66,5 +66,17 @@ export default async function rollout(cliClient) {
     const item = await read(court, "get_case", [caseId]);
     if (item.evidence_digest !== digest || item.message_hash !== messageHash) throw new Error("Evidence readback mismatch");
     console.log(JSON.stringify({ caseId, evidenceVerified: true, case: item }));
-  } else throw new Error("Set CG_ACTION to deploy, bind, register, or open, with explicit CG_ARGS");
+  } else if (action === "roles") {
+    const [registry, guildId, relayer] = parameters;
+    const guild = hashDiscordIdentifier("guild", guildId);
+    await write(registry, "set_roles", [guild, contractAddressArgument(relayer), contractAddressArgument(relayer), Math.floor(Date.now() / 1000) + 86400]);
+    console.log(JSON.stringify({ guild: await read(registry, "get_guild", [guild]) }));
+  } else if (action === "migrate-rule") {
+    const [registry, legacy, guildId, ruleId] = parameters;
+    const guild = hashDiscordIdentifier("guild", guildId);
+    const rule = await read(legacy, "get_rule", [guild, ruleId, 0]);
+    await write(registry, "add_rule", [guild, rule.rule_id, rule.name, rule.text, rule.mode,
+      rule.detector_json, rule.exceptions_json, rule.scope_json, rule.action, rule.appeal_allowed]);
+    console.log(JSON.stringify({ migratedRule: await read(registry, "get_rule", [guild, ruleId, 0]) }));
+  } else throw new Error("Set CG_ACTION to deploy, bind, register, open, roles, or migrate-rule, with explicit CG_ARGS");
 }

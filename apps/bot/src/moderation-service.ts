@@ -871,7 +871,12 @@ export class ModerationService {
 
   async publicCase(caseId: string): Promise<Record<string, unknown> | null> {
     if (this.gateway.protocol !== 2 || !/^case-[0-9a-f]{64}$/u.test(caseId)) return null;
-    const item = await this.gateway.getCase(caseId);
+    let item: ContractCase;
+    try { item = await this.gateway.getCase(caseId); }
+    catch (error) {
+      if (error instanceof Error && error.message.includes("[EXPECTED] Case does not exist")) return null;
+      throw error;
+    }
     const eligibility = await this.gateway.readPublic!("get_enforcement", [caseId]) as Record<string, unknown>;
     const execution = await this.gateway.readPublic!("get_enforcement", [caseId, item.decision_revision], "ledger") as Record<string, unknown>;
     return {

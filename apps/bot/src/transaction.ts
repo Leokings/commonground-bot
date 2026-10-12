@@ -35,8 +35,16 @@ function failureDetail(receipt: UnknownRecord): string | undefined {
   const genvm = record(receipt.genvm_result) ?? record(receipt.genvmResult);
   return (
     firstString(genvm, "error_description", "errorDescription", "stderr", "error_code") ||
+    firstString(record(receipt.result), "payload") ||
     undefined
   );
+}
+
+export function hasFinalizedStatus(value: unknown): boolean {
+  const receipt = record(value);
+  if (!receipt) return false;
+  const named = firstString(receipt, "statusName", "status_name", "status").toUpperCase();
+  return named ? named === "FINALIZED" : receipt.status === 7;
 }
 
 export function inspectReceiptExecution(value: unknown): ReceiptExecution {
@@ -54,6 +62,11 @@ export function inspectReceiptExecution(value: unknown): ReceiptExecution {
     return { outcome: "failure", detail: failureDetail(receipt) };
   }
   const leaders = leaderReceipts(receipt);
+  const outcomes = leaders.map((leader) => firstString(leader, "execution_result", "executionResult").toUpperCase());
+  if (outcomes.some((outcome) => ["SUCCESS", "FINISHED_WITH_RETURN"].includes(outcome))
+      && outcomes.some((outcome) => ["ERROR", "FAILURE", "FINISHED_WITH_ERROR"].includes(outcome))) {
+    return { outcome: "unknown", detail: "Mixed execution receipts require reconciliation" };
+  }
   if (
     leaders.some((leader) =>
       ["SUCCESS", "FINISHED_WITH_RETURN"].includes(
