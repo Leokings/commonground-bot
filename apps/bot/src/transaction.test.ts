@@ -19,6 +19,20 @@ describe("inspectReceiptExecution", () => {
       { execution_result: "ERROR", result: { status: "rollback", payload: "[EXPECTED] Permission denied" } },
     ] }})).toEqual({ outcome: "failure", detail: "[EXPECTED] Permission denied" });
   });
+
+  it("ignores cancelled idle validators mixed into StudioNet's leader receipt array", () => {
+    expect(inspectReceiptExecution({ consensus_data: { leader_receipt: [
+      { mode: "leader", execution_result: "SUCCESS" },
+      { mode: "validator", execution_result: "ERROR", result: { status: "contract_error", payload: "idle" } },
+    ] }})).toEqual({ outcome: "success" });
+  });
+
+  it("cannot replace a failed leader execution with a validator's success", () => {
+    expect(inspectReceiptExecution({ consensus_data: { leader_receipt: [
+      { mode: "leader", execution_result: "ERROR", result: { payload: "[EXPECTED] Denied" } },
+      { mode: "validator", execution_result: "SUCCESS" },
+    ] }})).toEqual({ outcome: "failure", detail: "[EXPECTED] Denied" });
+  });
   it("recognizes top-level successful execution", () => {
     expect(
       inspectReceiptExecution({ txExecutionResultName: "FINISHED_WITH_RETURN" }),

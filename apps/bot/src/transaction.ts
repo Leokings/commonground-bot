@@ -28,7 +28,8 @@ function leaderReceipts(receipt: UnknownRecord): UnknownRecord[] {
   if (!consensus) return [];
   const raw = consensus.leader_receipt ?? consensus.leaderReceipt;
   const values = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  return values.map(record).filter((value): value is UnknownRecord => Boolean(value));
+  return values.map(record).filter((value): value is UnknownRecord => Boolean(value))
+    .filter((value) => value.mode === undefined || value.mode === "leader");
 }
 
 function failureDetail(receipt: UnknownRecord): string | undefined {
