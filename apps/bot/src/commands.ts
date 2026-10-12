@@ -9,6 +9,8 @@ import {
   TextInputBuilder,
   TextInputStyle,
   ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   type ChatInputCommandInteraction,
   type Interaction,
   type MessageContextMenuCommandInteraction,
@@ -36,7 +38,10 @@ export const commandDefinitions = [
             .setDescription("Public name stored with the rule set")
             .setRequired(true)
             .setMaxLength(120),
-        ),
+        )
+        .addStringOption((option) => option.setName("admin-wallet")
+          .setDescription("V2: your wallet address, which will own this server's rules")
+          .setMaxLength(42)),
     )
     .addSubcommand((command) =>
       command
@@ -147,6 +152,14 @@ export const commandDefinitions = [
     .setName("case")
     .setDescription("View or appeal a rule-based moderation case")
     .setContexts(InteractionContextType.Guild)
+    .addSubcommand((command) => command.setName("defend")
+      .setDescription("Supply your public defense during the two-minute response window")
+      .addStringOption((option) => option.setName("case-id").setDescription("Case identifier").setRequired(true))
+      .addStringOption((option) => option.setName("reason").setDescription("Public on-chain defense; never include personal or secret data").setRequired(true).setMaxLength(2000)))
+    .addSubcommand((command) => command.setName("context")
+      .setDescription("Supply missing public context without consuming the appeal")
+      .addStringOption((option) => option.setName("case-id").setDescription("Case identifier").setRequired(true))
+      .addStringOption((option) => option.setName("reason").setDescription("Public on-chain context; never include personal or secret data").setRequired(true).setMaxLength(2000)))
     .addSubcommand((command) =>
       command
         .setName("status")
@@ -165,14 +178,14 @@ export const commandDefinitions = [
         .addStringOption((option) =>
           option
             .setName("reason")
-            .setDescription("Why the original decision should be reconsidered")
+            .setDescription("Public on-chain appeal reason; never include personal or secret data")
             .setRequired(true)
             .setMaxLength(2_000),
         ),
     ),
   new SlashCommandBuilder()
     .setName("report")
-    .setDescription("Report a message; CommonGround chooses the relevant rule")
+    .setDescription("Report a public message; its text and context are written permanently on-chain")
     .setContexts(InteractionContextType.Guild)
     .addStringOption((option) =>
       option
@@ -183,12 +196,12 @@ export const commandDefinitions = [
     .addStringOption((option) =>
       option
         .setName("reason")
-        .setDescription("Optional context; it will be included in the public GenLayer case")
+        .setDescription("Optional public on-chain context; do not include private or sensitive information")
         .setRequired(false)
         .setMaxLength(1_000),
     ),
   new ContextMenuCommandBuilder()
-    .setName("Report to CommonGround")
+    .setName("Review with CommonGround")
     .setType(ApplicationCommandType.Message)
     .setContexts(InteractionContextType.Guild),
 ].map((command) => command.toJSON());
@@ -314,6 +327,7 @@ async function handleRuleCommand(
   service: ModerationService,
 ): Promise<void> {
   if (!interaction.guildId) throw new Error("Rule commands require a server");
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) throw new Error("Manage Server permission is required for rule commands.");
   const subcommand = interaction.options.getSubcommand();
   if (subcommand === "add-rule" || subcommand === "edit-rule") {
     await interaction.showModal(ruleModal(interaction, subcommand));
@@ -322,7 +336,8 @@ async function handleRuleCommand(
   await interaction.deferReply({ flags: EPHEMERAL });
   if (subcommand === "setup") {
     const displayName = interaction.options.getString("display-name", true);
-    const result = await service.setupGuildWithDefaults(interaction.guildId, displayName);
+    const result = await service.setupGuildWithDefaults(interaction.guildId, displayName,
+      interaction.options.getString("admin-wallet") ?? undefined);
     await interaction.editReply(
       `Server registration finalized: \`${result.registrationHash}\`\n${installSummary(result.defaults)}`.slice(
         0,
@@ -368,13 +383,8 @@ async function handleCaseCommand(
   const subcommand = interaction.options.getSubcommand();
   const caseId = interaction.options.getString("case-id", true);
   if (subcommand === "status") {
-    const item = await service.getCase(interaction.guildId, caseId);
-    await interaction.editReply(
-      `Case \`${item.case_id}\`\nDecision: \`${item.decision}\`\nStatus: \`${item.status}\`\nRule: \`${item.rule_id}\` v${item.rule_version}\n${item.analysis}`.slice(
-        0,
-        2_000,
-      ),
-    );
+    const progress = await service.caseProgress(interaction.guildId, caseId);
+    await interaction.editReply(`Case \`${caseId}\`\nDecision: \`${progress.decision ?? "pending"}\`\nStatus: \`${progress.stage}\`\nRevision: \`${progress.revision}\`${progress.transactionHash ? `\nLatest transaction: \`${progress.transactionHash}\`` : ""}`.slice(0, 2_000));
     return;
   }
   const reason = interaction.options.getString("reason", true);
@@ -384,13 +394,20 @@ async function handleCaseCommand(
       interaction.memberPermissions?.has(PermissionFlagsBits.Administrator),
   );
   try {
+    if (subcommand === "defend" || subcommand === "context") {
+      const hash = await service.defendCase(interaction.guildId, caseId, reason, {
+        userId: interaction.user.id, canModerate,
+      });
+      await interaction.editReply(`Public evidence submitted: \`${hash}\`. CommonGround will continue the review after the transaction finalizes.`);
+      return;
+    }
     const result = await service.appealCase(interaction.guildId, caseId, reason, {
       userId: interaction.user.id,
       canModerate,
     });
-    await interaction.editReply(
-      `Appeal finalized: \`${result.transactionHash}\`\nRevision: \`${result.case.decision_revision}\`\nDecision: \`${result.case.decision}\``,
-    );
+    await interaction.editReply(result.pending
+      ? `Appeal submitted: \`${result.transactionHash}\`. CommonGround will publish the revised decision after finalization.`
+      : `Appeal finalized: \`${result.transactionHash}\`\nRevision: \`${result.case.decision_revision}\`\nDecision: \`${result.case.decision}\``);
   } catch (error) {
     const message = error instanceof Error ? error.message : "The appeal failed.";
     await interaction.editReply(message.slice(0, 2_000));
@@ -433,7 +450,26 @@ async function handleContextReport(
   interaction: MessageContextMenuCommandInteraction,
   service: ModerationService,
 ): Promise<void> {
-  await interaction.deferReply({ flags: EPHEMERAL });
+  const confirmId = `public-review:${interaction.id}`;
+  const cancelId = `cancel-review:${interaction.id}`;
+  await interaction.reply({
+    content: "This writes the reported message and a short excerpt of nearby public messages permanently to GenLayer. The case is public. Do not send private or sensitive content. Continue?",
+    flags: EPHEMERAL,
+    components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId(confirmId).setLabel("Continue public review").setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(cancelId).setLabel("Cancel").setStyle(ButtonStyle.Secondary),
+    )],
+  });
+  const prompt = await interaction.fetchReply();
+  const choice = await prompt.awaitMessageComponent({
+    filter: (component) => component.user.id === interaction.user.id,
+    time: 60_000,
+  }).catch(() => null);
+  if (!choice || choice.customId !== confirmId) {
+    await interaction.editReply({ content: choice ? "Public review cancelled." : "Confirmation expired. No report was sent.", components: [] });
+    return;
+  }
+  await choice.deferUpdate();
   await reportMessage(
     interaction,
     service,
@@ -449,6 +485,7 @@ async function handleModal(
   if (!interaction.guildId) throw new Error("This action requires a server");
   const parts = interaction.customId.split(":");
   if (parts[0] === "add-rule" || parts[0] === "edit-rule") {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) throw new Error("Manage Server permission is required for rule changes.");
     const [, ruleId, mode, action, appeal] = parts;
     if (!ruleId || !mode || !action || !appeal) throw new Error("Invalid rule form");
     const parsedMode = parseRuleMode(mode);

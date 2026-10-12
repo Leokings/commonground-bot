@@ -671,6 +671,161 @@ h1 {
   line-height: 1.6;
 }
 
+.governance-section {
+  padding-top: 0;
+}
+
+.governance-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
+  gap: clamp(30px, 6vw, 76px);
+  align-items: start;
+  padding: clamp(28px, 5vw, 58px);
+  border: 1px solid #e9dfcc;
+  border-radius: 26px;
+  background: #fffdf8;
+  box-shadow: 9px 9px 0 #e6d8bf;
+}
+
+.governance-copy h2,
+.case-lookup h2 {
+  max-width: 650px;
+  margin: 14px 0;
+  font-size: clamp(1.8rem, 3vw, 2.7rem);
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+}
+
+.governance-copy p,
+.case-lookup > p {
+  color: #59647a;
+  line-height: 1.65;
+}
+
+.governance-copy .button {
+  margin-top: 14px;
+  border: 0;
+  cursor: pointer;
+}
+
+.governance-form {
+  display: grid;
+  gap: 14px;
+}
+
+.governance-form label,
+.case-lookup form label {
+  display: grid;
+  gap: 7px;
+  color: #34415a;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.governance-form input,
+.governance-form select,
+.case-lookup input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 13px;
+  border: 1px solid #d9d4c9;
+  border-radius: 12px;
+  outline-color: #6c4bf4;
+  background: #fff;
+  color: #14233b;
+}
+
+.governance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.governance-actions .button {
+  min-height: 46px;
+  border: 0;
+  cursor: pointer;
+}
+
+.governance-panel button:disabled,
+.case-lookup button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.governance-status {
+  margin: 0;
+  color: #365847;
+  line-height: 1.5;
+}
+
+.governance-form small,
+.case-result > small {
+  color: #657087;
+  line-height: 1.5;
+}
+
+.case-lookup {
+  padding-block: 40px 90px;
+}
+
+.case-lookup form {
+  max-width: 760px;
+  margin-top: 24px;
+}
+
+.case-lookup form > div {
+  display: flex;
+  gap: 10px;
+  margin-top: 7px;
+}
+
+.case-lookup input {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.case-lookup button {
+  border: 0;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.case-result {
+  max-width: 900px;
+  margin-top: 28px;
+  padding: 24px;
+  border: 1px solid #e9dfcc;
+  border-radius: 20px;
+  background: #fffdf8;
+}
+
+.case-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.case-result ol {
+  display: grid;
+  gap: 14px;
+  margin: 24px 0;
+  padding-left: 24px;
+}
+
+.case-result li span {
+  display: block;
+  margin-top: 4px;
+  color: #657087;
+  font-size: 0.9rem;
+}
+
+.case-result li p {
+  margin-bottom: 0;
+  line-height: 1.55;
+}
+
 .evidence-band {
   padding-block: 105px;
   color: #fff7e8;
@@ -944,6 +1099,21 @@ footer > div {
 
   .privacy-note {
     padding: 22px;
+  }
+
+  .governance-panel {
+    grid-template-columns: 1fr;
+    padding: 24px;
+    box-shadow: 6px 6px 0 #e6d8bf;
+  }
+
+  .case-lookup form > div {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .case-lookup form .button {
+    justify-content: center;
   }
 
   .final-actions,

@@ -5,6 +5,9 @@ export type ReceiptExecution = {
 
 type UnknownRecord = Record<string, unknown>;
 
+/** Only this error proves finalized execution failed. All other polling errors are unknown. */
+export class FinalizedExecutionError extends Error {}
+
 function record(value: unknown): UnknownRecord | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as UnknownRecord)

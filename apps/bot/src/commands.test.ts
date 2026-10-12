@@ -8,7 +8,7 @@ describe("Discord command definitions", () => {
       "rule",
       "case",
       "report",
-      "Report to CommonGround",
+      "Review with CommonGround",
     ]);
   });
 
@@ -38,7 +38,7 @@ describe("Discord command definitions", () => {
       "reason",
     ]);
     expect(
-      commandDefinitions.find((command) => command.name === "Report to CommonGround")
+      commandDefinitions.find((command) => command.name === "Review with CommonGround")
         ?.default_member_permissions,
     ).toBeUndefined();
   });

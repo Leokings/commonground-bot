@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryOperationStore } from "./operation-store.js";
 
 describe("MemoryOperationStore", () => {
+  afterEach(() => vi.useRealTimers());
+
   it("persists transaction state and case bindings idempotently", async () => {
     const store = new MemoryOperationStore();
     await store.initialize();
@@ -16,6 +18,7 @@ describe("MemoryOperationStore", () => {
       submittedAt: now,
       updatedAt: now,
     });
+    expect(await store.latestCaseOperation("case-1", "open_case")).toMatchObject({ transactionHash: "0xabc", status: "submitted" });
     expect(await store.pendingOperations()).toHaveLength(1);
     await store.updateOperation("0xabc", "finalized");
     expect(await store.pendingOperations()).toHaveLength(0);
@@ -50,5 +53,22 @@ describe("MemoryOperationStore", () => {
     expect(await store.recordStrike("event-3", "guild", "other", "spam")).toBe(1);
     expect(await store.retractStrike("event-1")).toBe(true);
     expect(await store.retractStrike("event-1")).toBe(false);
+  });
+
+  it("rotates retried broadcasts and removes their signed payload after completion", async () => {
+    vi.useFakeTimers();
+    const store = new MemoryOperationStore();
+    const first = { id: "first", raw: "0x01" as const, evmHash: "0x01" as const, kind: "open_case" as const, guildId: "guild" };
+    const second = { id: "second", raw: "0x02" as const, evmHash: "0x02" as const, kind: "open_case" as const, guildId: "guild" };
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    await store.saveBroadcast(first);
+    vi.setSystemTime(new Date("2026-01-01T00:00:01Z"));
+    await store.saveBroadcast(second);
+    vi.setSystemTime(new Date("2026-01-01T00:00:02Z"));
+    await store.touchBroadcast(first.id);
+
+    expect((await store.pendingBroadcasts()).map((item) => item.id)).toEqual(["second", "first"]);
+    await store.completeBroadcast(second.id);
+    expect((await store.pendingBroadcasts()).map((item) => item.id)).toEqual(["first"]);
   });
 });

@@ -25,6 +25,9 @@ const configSchema = z.object({
     .enum(["localnet", "studionet", "testnet-bradbury"])
     .default("localnet"),
   GENLAYER_CONTRACT_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
+  GENLAYER_REGISTRY_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
+  GENLAYER_LEDGER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
+  GENLAYER_ADMIN_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   GENLAYER_RPC_URL: optionalUrl,
   AUTO_SUBMIT_HYBRID: z
     .enum(["true", "false"])
@@ -72,6 +75,12 @@ export function loadCommandRegistrationConfig(
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env) {
   const parsed = configSchema.parse(environment);
+  if (Boolean(parsed.GENLAYER_REGISTRY_ADDRESS) !== Boolean(parsed.GENLAYER_LEDGER_ADDRESS)) {
+    throw new Error("Configure both v2 companion addresses together");
+  }
+  if (environment.NODE_ENV === "production" && !(parsed.DATABASE_URL ?? parsed.POSTGRES_URI ?? parsed.NF_COMMONGROUND_DB_POSTGRES_URI)) {
+    throw new Error("Production requires PostgreSQL for durable recovery");
+  }
   return {
     discordToken: parsed.DISCORD_BOT_TOKEN,
     discordClientId: parsed.DISCORD_CLIENT_ID,
@@ -85,6 +94,9 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env) {
     genlayerPrivateKey: parsed.GENLAYER_PRIVATE_KEY as `0x${string}`,
     genlayerNetwork: parsed.GENLAYER_NETWORK,
     genlayerContractAddress: parsed.GENLAYER_CONTRACT_ADDRESS as `0x${string}`,
+    registryAddress: parsed.GENLAYER_REGISTRY_ADDRESS as `0x${string}` | undefined,
+    ledgerAddress: parsed.GENLAYER_LEDGER_ADDRESS as `0x${string}` | undefined,
+    adminAddress: parsed.GENLAYER_ADMIN_ADDRESS as `0x${string}` | undefined,
     genlayerRpcUrl: parsed.GENLAYER_RPC_URL,
     autoSubmitHybrid: parsed.AUTO_SUBMIT_HYBRID,
     databaseUrl:

@@ -45,4 +45,23 @@ describe("health server", () => {
     expect(healthy.status).toBe(200);
     expect(await healthy.json()).toMatchObject({ ready: true });
   });
+
+  it("serves only valid public case IDs through its read-only API", async () => {
+    const reads: string[] = [];
+    const validCase = `case-${"a".repeat(64)}`;
+    const server = await startHealthServer(0, () => ({ ready: true, network: "studionet", contractAddress: `0x${"22".repeat(20)}`, release: "test" }), async (caseId) => {
+      reads.push(caseId);
+      return { caseId, decision: "allowed" };
+    });
+    servers.push(server);
+    const port = (server.address() as AddressInfo).port;
+    const response = await fetch(`http://127.0.0.1:${port}/api/cases/${validCase}`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ caseId: validCase, decision: "allowed" });
+    const invalid = await fetch(`http://127.0.0.1:${port}/api/cases/not-a-case`);
+    expect(invalid.status).toBe(404);
+    expect(reads).toEqual([validCase]);
+    const post = await fetch(`http://127.0.0.1:${port}/api/cases/${validCase}`, { method: "POST" });
+    expect(post.status).toBe(405);
+  });
 });

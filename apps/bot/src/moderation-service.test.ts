@@ -580,6 +580,10 @@ describe("member-driven reports", () => {
         guildId: "guild-1",
         channelId: "channel-1",
         guild: { roles: { everyone: { id: "guild-1" } } },
+        channel: {
+          type: ChannelType.GuildText,
+          permissionsFor: () => ({ has: () => true }),
+        },
         inGuild: () => true,
         author: { id: authorId, bot },
         content,

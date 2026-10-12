@@ -27,6 +27,18 @@ describe("bot configuration", () => {
     expect(config.port).toBe(3000);
   });
 
+  it("allows v2 configuration without a global guild owner wallet", () => {
+    const config = loadConfig({
+      ...validEnvironment,
+      GENLAYER_REGISTRY_ADDRESS: `0x${"33".repeat(20)}`,
+      GENLAYER_LEDGER_ADDRESS: `0x${"44".repeat(20)}`,
+      NODE_ENV: "test",
+    });
+
+    expect(config.registryAddress).toBe(`0x${"33".repeat(20)}`);
+    expect(config.adminAddress).toBeUndefined();
+  });
+
   it("uses the Northflank PostgreSQL connection variable", () => {
     const config = loadConfig({
       ...validEnvironment,

@@ -33,6 +33,21 @@ walkthrough, a context-routing demo, and direct explorer evidence. See
 [`docs/reviewer-guide.md`](docs/reviewer-guide.md) for the shortest live test and
 [`docs/live-verification.md`](docs/live-verification.md) for lifecycle links.
 
+## Architecture v2 rollout
+
+The current release work adds three purpose-separated contracts: `CommunityRegistry`
+for per-server rule versions and wallet permissions, `CaseCourt` for exact-hash,
+defense-aware contextual decisions, and `EnforcementLedger` for finalized
+decision history plus explicitly executor-reported Discord outcomes. The bot
+keeps Discord identity checks, durable workflow recovery, and execution; the
+GenLayer contracts do not claim proof that a Discord message is authentic or
+that an executor really performed an action.
+
+V2 is not considered live until the hosted health endpoint reports protocol 2
+and the registry and ledger addresses. The existing StudioNet contract and its
+historical evidence remain unchanged. Do not treat v2 source or local tests as
+proof of a live deployment. See [`docs/architecture-v2.md`](docs/architecture-v2.md).
+
 See [`docs/architecture.md`](docs/architecture.md) for the trust boundary and
 end-to-end flow.
 

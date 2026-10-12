@@ -5,11 +5,18 @@ export interface HealthSnapshot {
   network: string;
   contractAddress: string;
   release: string;
+  protocol?: number;
+  registryAddress?: string;
+  ledgerAddress?: string;
+  relayerAddress?: string;
 }
+
+export type PublicCaseReader = (caseId: string) => Promise<unknown | null>;
 
 export function startHealthServer(
   port: number,
   getSnapshot: () => HealthSnapshot,
+  readPublicCase?: PublicCaseReader,
 ): Promise<Server> {
   const server = createServer((request, response) => {
     const snapshot = getSnapshot();
@@ -37,6 +44,18 @@ export function startHealthServer(
     if (request.url === "/") {
       response.statusCode = 200;
       response.end(body);
+      return;
+    }
+
+    const caseMatch = /^\/api\/cases\/(case-[0-9a-f]{64})$/u.exec(new URL(request.url ?? "/", "http://localhost").pathname);
+    if (caseMatch && readPublicCase) {
+      void readPublicCase(caseMatch[1]!).then((item) => {
+        response.statusCode = item === null ? 404 : 200;
+        response.end(JSON.stringify(item ?? { error: "case_not_found" }));
+      }).catch(() => {
+        response.statusCode = 503;
+        response.end(JSON.stringify({ error: "case_service_unavailable" }));
+      });
       return;
     }
 

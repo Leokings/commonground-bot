@@ -1,7 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import { ValidatorCanvas } from "./components/ValidatorCanvas";
+import { CaseLookup } from "./components/CaseLookup";
 
+const AdminWalletPanel = lazy(() => import("./components/AdminWalletPanel").then((module) => ({ default: module.AdminWalletPanel })));
 const WalkthroughPlayer = lazy(() => import("./components/WalkthroughPlayer"));
 
 const CLIENT_ID = "1552600187556462652";
@@ -314,8 +316,8 @@ export function App() {
               <span className="step-number">2</span>
               <div className="step-icon mint">/</div>
               <h3>Run one command</h3>
-              <p>Use the admin command to register the server and install the editable starter pack.</p>
-              <code>/rule setup</code>
+              <p>Register the server, install the starter pack, and assign the wallet that owns its rules.</p>
+              <code>/rule setup display-name admin-wallet</code>
             </li>
             <li>
               <span className="step-number">3</span>
@@ -328,14 +330,21 @@ export function App() {
           <div className="privacy-note">
             <span className="privacy-icon">◉</span>
             <div>
-              <strong>Private by default where it matters.</strong>
+              <strong>Only reported public messages are reviewed.</strong>
               <p>
-                CommonGround ignores unreported messages and rejects private channels.
-                Only a bounded, pseudonymized conversation snapshot accompanies a contextual case.
+                CommonGround ignores unreported messages and rejects private channels. The reported text, your report reason, and a short pseudonymized public-context excerpt are written permanently to GenLayer. Avoid reporting personal or sensitive information.
               </p>
             </div>
           </div>
         </section>
+
+        <section className="section-shell section-space governance-section">
+          <Suspense fallback={<div className="player-loading">Loading server owner controls…</div>}>
+            <AdminWalletPanel />
+          </Suspense>
+        </section>
+
+        <CaseLookup />
 
         <section className="evidence-band" id="evidence">
           <div className="section-shell">

@@ -22,7 +22,7 @@
     "typecheck": "npm run build -w @commonground/core && npm run typecheck -w @commonground/core && npm run typecheck -w @commonground/bot && npm run typecheck -w @commonground/web",
     "test": "npm run build -w @commonground/core && npm run test -w @commonground/core && npm run test -w @commonground/bot",
     "test:contract": "pytest tests/direct -q",
-    "lint:contract": "genvm-lint check contracts/discord_constitution.py --json",
+    "lint:contract": "genvm-lint check contracts/discord_constitution.py --json && genvm-lint check contracts/CommunityRegistry.py --json && genvm-lint check contracts/CaseCourt.py --json && genvm-lint check contracts/EnforcementLedger.py --json",
     "schema:contract": "genvm-lint schema contracts/discord_constitution.py --output abi/discord_constitution.json",
     "verify": "npm run lint:contract && npm run test:contract && npm run typecheck && npm run test && npm run build"
   },
