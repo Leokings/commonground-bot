@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const HEALTH_URL = "https://p01--commonground-bot--2tgdv5n7tzkj.code.run";
 type CaseReceipt = {
@@ -9,11 +9,30 @@ type CaseReceipt = {
   history: Array<{ revision: number; kind: string; decision: string; analysis: string; decidedAt: string }>;
 };
 
+type Availability = "checking" | "ready" | "unavailable";
+type Health = { protocol?: number; ready?: boolean };
+
 export function CaseLookup() {
+  const [availability, setAvailability] = useState<Availability>("checking");
   const [caseId, setCaseId] = useState("");
   const [item, setItem] = useState<CaseReceipt | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`${HEALTH_URL}/health`, { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Health returned ${response.status}`);
+        return (await response.json()) as Health;
+      })
+      .then((health) => setAvailability(health.protocol === 2 && health.ready ? "ready" : "unavailable"))
+      .catch(() => {
+        if (!controller.signal.aborted) setAvailability("unavailable");
+      });
+    return () => controller.abort();
+  }, []);
+
   async function lookup(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setMessage(""); setItem(null);
     if (!/^case-[0-9a-f]{64}$/.test(caseId)) { setMessage("Enter the full case ID from CommonGround."); setBusy(false); return; }
@@ -25,6 +44,19 @@ export function CaseLookup() {
     } catch (error) { setMessage(error instanceof Error ? error.message : "Case lookup failed."); }
     finally { setBusy(false); }
   }
+
+  if (availability !== "ready") {
+    const status = availability === "checking"
+      ? "Checking whether public case lookup is available…"
+      : "Public API lookup is not live yet. In Discord, use /case status with the case ID to read the finalized on-chain result.";
+    return <section className="section-shell case-lookup" aria-labelledby="case-lookup-title">
+      <div className="eyebrow">PUBLIC CASE STATUS</div>
+      <h2 id="case-lookup-title">Follow a finalized case.</h2>
+      <p>Read case status and decision history without opening the reported message.</p>
+      <p className="governance-status" role="status">{status}</p>
+    </section>;
+  }
+
   return <section className="section-shell case-lookup" aria-labelledby="case-lookup-title">
     <div className="eyebrow">PUBLIC CASE STATUS</div>
     <h2 id="case-lookup-title">Follow a case without a Discord login.</h2>

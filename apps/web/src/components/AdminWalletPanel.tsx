@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const HEALTH_URL = "https://p01--commonground-bot--2tgdv5n7tzkj.code.run/health";
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
 type Provider = { request(args: { method: string; params?: readonly unknown[] }): Promise<unknown> };
-type Deployment = { protocol?: number; registryAddress?: string; relayerAddress?: string };
+type Deployment = { protocol?: number; registryAddress?: string; relayerAddress?: string; ready?: boolean };
 declare global { interface Window { ethereum?: Provider } }
+
+type Availability = "checking" | "ready" | "unavailable";
 
 async function guildKey(discordId: string): Promise<string> {
   const bytes = new TextEncoder().encode(`guild:${discordId}`);
@@ -17,24 +19,57 @@ export function AdminWalletPanel() {
   const [duration, setDuration] = useState("604800");
   const [wallet, setWallet] = useState("");
   const [deployment, setDeployment] = useState<Deployment | null>(null);
+  const [availability, setAvailability] = useState<Availability>("checking");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [txHash, setTxHash] = useState("");
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(HEALTH_URL, { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Health returned ${response.status}`);
+        return (await response.json()) as Deployment;
+      })
+      .then((current) => {
+        setDeployment(current);
+        setAvailability(current.ready === true && current.protocol === 2 && Boolean(current.registryAddress && current.relayerAddress) ? "ready" : "unavailable");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setAvailability("unavailable");
+      });
+    return () => controller.abort();
+  }, []);
+
   async function connect() {
     setBusy(true); setMessage("");
     try {
+      if (availability !== "ready" || !deployment?.registryAddress || !deployment.relayerAddress) {
+        throw new Error("The v2 governance contracts are not live yet. No wallet connection is needed for the current Discord flow.");
+      }
       if (!window.ethereum) throw new Error("Install or open an EIP-1193 wallet extension first.");
       const accounts = await window.ethereum.request({ method: "eth_requestAccounts" }) as string[];
       if (!accounts[0]) throw new Error("The wallet did not return an account.");
-      const response = await fetch(HEALTH_URL, { cache: "no-store" });
-      if (!response.ok) throw new Error("CommonGround’s contract configuration is unavailable.");
-      const current = await response.json() as Deployment;
-      if (current.protocol !== 2 || !current.registryAddress || !current.relayerAddress) throw new Error("The v2 governance contracts are not live yet.");
-      setWallet(accounts[0]); setDeployment(current);
+      setWallet(accounts[0]);
       setMessage("Wallet connected. Enter the Discord server ID to continue.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Wallet connection failed."); }
     finally { setBusy(false); }
+  }
+
+  if (availability !== "ready") {
+    const status = availability === "checking"
+      ? "Checking the hosted contract configuration…"
+      : "Not live yet · waiting for the v2 governance contracts";
+    return <section className="governance-panel" aria-labelledby="governance-title">
+      <div className="governance-copy">
+        <div className="eyebrow">UPCOMING SERVER OWNER CONTROL</div>
+        <h2 id="governance-title">Temporary rule-edit delegation</h2>
+        <p>This wallet control is unavailable until protocol v2 is deployed. The current Discord report and rule commands continue to work; you do not need to connect a wallet for them.</p>
+      </div>
+      <div className="governance-form">
+        <p className="governance-status" role="status">{status}</p>
+      </div>
+    </section>;
   }
 
   async function delegate(revoke: boolean) {
