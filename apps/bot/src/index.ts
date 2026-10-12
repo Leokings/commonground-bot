@@ -1,4 +1,4 @@
-import { Client, Events, GatewayIntentBits, MessageFlags, REST, Routes } from "discord.js";
+import { Client, Events, GatewayIntentBits, MessageFlags, REST } from "discord.js";
 
 import { commandDefinitions, handleInteraction } from "./commands.js";
 import { loadConfig } from "./config.js";
@@ -8,14 +8,12 @@ import { startHealthServer } from "./health-server.js";
 import { logger } from "./logger.js";
 import { ModerationService } from "./moderation-service.js";
 import { createOperationStore } from "./operation-store.js";
+import { syncCommands } from "./sync-commands.js";
 
 loadEnvironment();
 const config = loadConfig();
 const discordRest = new REST({ version: "10" }).setToken(config.discordToken);
-await discordRest.put(Routes.applicationCommands(config.discordClientId), { body: commandDefinitions });
-if (config.discordTestGuildId) {
-  await discordRest.put(Routes.applicationGuildCommands(config.discordClientId, config.discordTestGuildId), { body: commandDefinitions });
-}
+await syncCommands(discordRest, config.discordClientId, config.discordTestGuildId);
 logger.info({ commands: commandDefinitions.length }, "Discord commands registered for this release");
 const client = new Client({
   intents: [
