@@ -319,7 +319,7 @@ async function reportMessage(
   reason: string,
 ): Promise<void> {
   const result = await service.reviewReportedMessage(message, reason);
-  await interaction.editReply(service.reportResultMessage(result));
+  await interaction.editReply({ content: service.reportResultMessage(result), components: [] });
 }
 
 async function handleRuleCommand(

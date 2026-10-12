@@ -47,6 +47,24 @@ export function hasFinalizedStatus(value: unknown): boolean {
   return named ? named === "FINALIZED" : receipt.status === 7;
 }
 
+/** Decode only the bounded UserError payload, never an RPC's full state snapshot. */
+export function expectedReadRevert(value: unknown): string | undefined {
+  let current = record(value);
+  for (let depth = 0; current && depth < 4; depth += 1) {
+    const message = firstString(current, "message");
+    if (message === "[EXPECTED] Case does not exist" || message.endsWith(": [EXPECTED] Case does not exist")) return "[EXPECTED] Case does not exist";
+    const receipt = record(record(current.data)?.receipt);
+    const encoded = receipt?.result;
+    if (typeof encoded === "string" && encoded.length < 4096 && /^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
+      const bytes = Buffer.from(encoded, "base64");
+      const reason = bytes.subarray(1).toString("utf8");
+      if (bytes[0] === 1 && reason.startsWith("[EXPECTED] ")) return reason;
+    }
+    current = record(current.cause);
+  }
+  return undefined;
+}
+
 export function inspectReceiptExecution(value: unknown): ReceiptExecution {
   const receipt = record(value);
   if (!receipt) return { outcome: "unknown" };

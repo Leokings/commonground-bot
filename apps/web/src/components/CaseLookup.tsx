@@ -38,7 +38,7 @@ export function CaseLookup() {
     if (!/^case-[0-9a-f]{64}$/.test(caseId)) { setMessage("Enter the full case ID from CommonGround."); setBusy(false); return; }
     try {
       const response = await fetch(`${HEALTH_URL}/api/cases/${caseId}`, { cache: "no-store" });
-      if (response.status === 404) throw new Error("No public v2 case was found for that ID.");
+      if (response.status === 404) throw new Error("This case is not on-chain yet, or the ID is unknown. Queued reports appear after submission finalizes.");
       if (!response.ok) throw new Error("The public case service could not be reached.");
       setItem(await response.json() as CaseReceipt);
     } catch (error) { setMessage(error instanceof Error ? error.message : "Case lookup failed."); }

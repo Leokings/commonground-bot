@@ -33,7 +33,7 @@ import type {
   StoredOperation,
 } from "./operation-store.js";
 import { RuleCache } from "./rule-cache.js";
-import { FinalizedExecutionError } from "./transaction.js";
+import { expectedReadRevert, FinalizedExecutionError } from "./transaction.js";
 import { assertEvidenceText, evidenceExcerpt } from "./evidence-text.js";
 
 export interface DefaultRuleInstallResult {
@@ -874,7 +874,7 @@ export class ModerationService {
     let item: ContractCase;
     try { item = await this.gateway.getCase(caseId); }
     catch (error) {
-      if (error instanceof Error && error.message.includes("[EXPECTED] Case does not exist")) return null;
+      if (expectedReadRevert(error) === "[EXPECTED] Case does not exist") return null;
       throw error;
     }
     const eligibility = await this.gateway.readPublic!("get_enforcement", [caseId]) as Record<string, unknown>;

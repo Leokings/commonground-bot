@@ -164,7 +164,9 @@ describe("v2 durable moderation workflow", () => {
 
   it("distinguishes a missing public case from an RPC outage", async () => {
     const f = await fixture();
-    vi.mocked(f.gateway.getCase).mockRejectedValueOnce(new Error("gen_call failed: [EXPECTED] Case does not exist"));
+    const error = new Error("Missing or invalid parameters");
+    Object.assign(error, { cause: { data: { receipt: { result: Buffer.concat([Buffer.from([1]), Buffer.from("[EXPECTED] Case does not exist")]).toString("base64") } } } });
+    vi.mocked(f.gateway.getCase).mockRejectedValueOnce(error);
     expect(await f.bot.publicCase(caseId)).toBeNull();
     vi.mocked(f.gateway.getCase).mockRejectedValueOnce(new Error("RPC temporarily unavailable"));
     await expect(f.bot.publicCase(caseId)).rejects.toThrow("RPC temporarily unavailable");
