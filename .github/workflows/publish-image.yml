@@ -13,6 +13,18 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: commonground
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: commonground_audit
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U commonground -d commonground_audit"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -36,6 +48,11 @@ jobs:
 
       - name: Verify contracts, bot, and reviewer site
         run: npm run verify
+
+      - name: Verify PostgreSQL durability and leases
+        run: npx tsx scripts/postgres-smoke.ts
+        env:
+          DATABASE_URL: postgresql://commonground:test-only-password@localhost:5432/commonground_audit
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

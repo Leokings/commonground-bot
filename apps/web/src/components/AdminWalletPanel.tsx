@@ -78,17 +78,21 @@ export function AdminWalletPanel() {
       const provider = window.ethereum;
       if (!wallet || !deployment?.registryAddress || !deployment.relayerAddress || !provider) throw new Error("Connect an EIP-1193 wallet first.");
       if (!/^\d{5,25}$/.test(discordId)) throw new Error("Enter the numeric Discord server ID.");
-      const [{ createClient }, { studionet }] = await Promise.all([
+      const [{ createClient }, { studionet }, { CalldataAddress }] = await Promise.all([
         import("genlayer-js"),
         import("genlayer-js/chains"),
+        import("genlayer-js/types"),
       ]);
+      const addressArgument = (value: string) => new CalldataAddress(new Uint8Array(
+        value.slice(2).match(/.{2}/g)!.map((byte) => parseInt(byte, 16)),
+      ));
       const client = createClient({ chain: studionet as never, account: wallet as `0x${string}`, provider: provider as never });
       await client.connect("studionet");
       const expiry = revoke ? 0 : Math.floor(Date.now() / 1000) + Number(duration);
       const hash = await client.writeContract({
         address: deployment.registryAddress as `0x${string}`,
         functionName: "set_roles",
-        args: [await guildKey(discordId), deployment.relayerAddress as `0x${string}`, revoke ? ZERO : deployment.relayerAddress as `0x${string}`, expiry],
+        args: [await guildKey(discordId), addressArgument(deployment.relayerAddress), addressArgument(revoke ? ZERO : deployment.relayerAddress), expiry],
         value: 0n,
       });
       setTxHash(String(hash));

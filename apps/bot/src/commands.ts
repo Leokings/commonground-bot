@@ -384,7 +384,7 @@ async function handleCaseCommand(
   const caseId = interaction.options.getString("case-id", true);
   if (subcommand === "status") {
     const progress = await service.caseProgress(interaction.guildId, caseId);
-    await interaction.editReply(`Case \`${caseId}\`\nDecision: \`${progress.decision ?? "pending"}\`\nStatus: \`${progress.stage}\`\nRevision: \`${progress.revision}\`${progress.transactionHash ? `\nLatest transaction: \`${progress.transactionHash}\`` : ""}`.slice(0, 2_000));
+    await interaction.editReply(`Case \`${caseId}\`\nDecision: \`${progress.decision ?? "pending"}\`\nStatus: \`${progress.stage}\`\nRevision: \`${progress.revision}\`${progress.transactionHash ? `\nLatest transaction: \`${progress.transactionHash}\`` : ""}${progress.defenseDeadline ? `\nDefense deadline: <t:${progress.defenseDeadline}:F>` : ""}${progress.appealDeadline ? `\nAppeal deadline: <t:${progress.appealDeadline}:F>` : ""}`.slice(0, 2_000));
     return;
   }
   const reason = interaction.options.getString("reason", true);

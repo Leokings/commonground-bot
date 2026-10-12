@@ -18,6 +18,7 @@ export function startHealthServer(
   getSnapshot: () => HealthSnapshot,
   readPublicCase?: PublicCaseReader,
 ): Promise<Server> {
+  let activeCaseReads = 0;
   const server = createServer((request, response) => {
     const snapshot = getSnapshot();
     const body = JSON.stringify({
@@ -47,15 +48,30 @@ export function startHealthServer(
       return;
     }
 
-    const caseMatch = /^\/api\/cases\/(case-[0-9a-f]{64})$/u.exec(new URL(request.url ?? "/", "http://localhost").pathname);
+    let pathname: string;
+    try {
+      pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+    } catch {
+      response.statusCode = 400;
+      response.end(JSON.stringify({ error: "invalid_request_url" }));
+      return;
+    }
+    const caseMatch = /^\/api\/cases\/(case-[0-9a-f]{64})$/u.exec(pathname);
     if (caseMatch && readPublicCase) {
-      void readPublicCase(caseMatch[1]!).then((item) => {
+      if (activeCaseReads >= 8) {
+        response.statusCode = 503;
+        response.setHeader("retry-after", "5");
+        response.end(JSON.stringify({ error: "case_service_busy" }));
+        return;
+      }
+      activeCaseReads += 1;
+      void Promise.resolve().then(() => readPublicCase(caseMatch[1]!)).then((item) => {
         response.statusCode = item === null ? 404 : 200;
         response.end(JSON.stringify(item ?? { error: "case_not_found" }));
       }).catch(() => {
         response.statusCode = 503;
         response.end(JSON.stringify({ error: "case_service_unavailable" }));
-      });
+      }).finally(() => { activeCaseReads -= 1; });
       return;
     }
 

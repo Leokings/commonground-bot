@@ -31,6 +31,7 @@ export interface CaseWorkflow {
   actionRevision?: number;
   actionStarted?: boolean;
   ledgerHash?: string;
+  defenseAnnounced?: boolean;
 }
 
 export type OperationStatus = "submitted" | "finalized" | "failed";
@@ -63,6 +64,7 @@ export interface CaseBinding {
 }
 
 export interface OperationStore {
+  close?(): Promise<void>;
   initialize(): Promise<void>;
   saveOperation(operation: StoredOperation): Promise<void>;
   updateOperation(
@@ -225,6 +227,10 @@ export class PostgresOperationStore implements OperationStore {
 
   constructor(databaseUrl: string) {
     this.#pool = new Pool({ connectionString: databaseUrl, max: 5 });
+  }
+
+  async close(): Promise<void> {
+    await this.#pool.end();
   }
 
   async initialize(): Promise<void> {

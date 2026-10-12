@@ -14,6 +14,7 @@ import type { BotConfig } from "./config.js";
 import { logger } from "./logger.js";
 import { FinalizedExecutionError, inspectReceiptExecution } from "./transaction.js";
 import type { BroadcastRecord } from "./operation-store.js";
+import { contractAddressArgument } from "./calldata-address.js";
 
 const finalizedDecisionSchema = z.enum(["allowed", "violation", "needs_context"]);
 const decisionRecordSchema = z.object({
@@ -170,6 +171,7 @@ export function createContractGateway(config: BotConfig): ContractGateway {
       if (config.registryAddress && ["register_guild", "add_rule", "update_rule", "disable_rule"].includes(functionName)) {
         address = config.registryAddress;
         if (functionName === "register_guild" && callArgs.length === 2) callArgs.push(config.adminAddress!);
+        if (functionName === "register_guild") callArgs[2] = contractAddressArgument(callArgs[2]);
         if (functionName === "update_rule" || functionName === "disable_rule") {
           const rule = await read("get_rule", [args[0]!, args[1]!, 0], address) as { version: number };
           callArgs.push(rule.version);

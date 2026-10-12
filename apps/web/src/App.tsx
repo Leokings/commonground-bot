@@ -10,7 +10,6 @@ const CLIENT_ID = "1552600187556462652";
 const INSTALL_URL = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=76800&integration_type=0&scope=bot%20applications.commands`;
 const GITHUB_URL = "https://github.com/Leokings/commonground-bot";
 const CONTRACT_ADDRESS = "0x01858Aad8C071fE3677588C6d3b107da47d879C8";
-const CONTRACT_URL = `https://explorer-studio.genlayer.com/address/${CONTRACT_ADDRESS}`;
 const HEALTH_URL =
   "https://p01--commonground-bot--2tgdv5n7tzkj.code.run/health";
 const EVIDENCE = [
@@ -40,6 +39,9 @@ type Health = {
   network: string;
   contractAddress?: string;
   release?: string;
+  protocol?: number;
+  registryAddress?: string;
+  ledgerAddress?: string;
 };
 
 const samples = [
@@ -89,27 +91,7 @@ function ExternalLink({
   );
 }
 
-function LiveStatus() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 8_000);
-    fetch(HEALTH_URL, { signal: controller.signal, cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`Health returned ${response.status}`);
-        return (await response.json()) as Health;
-      })
-      .then((value) => setHealth(value))
-      .catch(() => setFailed(true))
-      .finally(() => window.clearTimeout(timer));
-    return () => {
-      controller.abort();
-      window.clearTimeout(timer);
-    };
-  }, []);
-
+function LiveStatus({ health, failed }: { health: Health | null; failed: boolean }) {
   if (health?.ready) {
     return (
       <ExternalLink href={HEALTH_URL} className="status-pill status-live">
@@ -137,6 +119,23 @@ function Logo() {
 }
 
 export function App() {
+  const [health, setHealth] = useState<Health | null>(null);
+  const [healthFailed, setHealthFailed] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 8_000);
+    fetch(HEALTH_URL, { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Health returned ${response.status}`);
+        return (await response.json()) as Health;
+      })
+      .then(setHealth)
+      .catch(() => setHealthFailed(true))
+      .finally(() => window.clearTimeout(timer));
+    return () => { controller.abort(); window.clearTimeout(timer); };
+  }, []);
+  const contractAddress = health?.contractAddress ?? CONTRACT_ADDRESS;
+  const contractUrl = `https://explorer-studio.genlayer.com/address/${contractAddress}`;
   const [sampleId, setSampleId] = useState<(typeof samples)[number]["id"]>(
     "praise",
   );
@@ -215,9 +214,9 @@ export function App() {
         </section>
 
         <section className="proof-strip" aria-label="Live deployment status">
-          <LiveStatus />
-          <ExternalLink href={CONTRACT_URL} className="strip-link">
-            Contract {CONTRACT_ADDRESS.slice(0, 8)}…{CONTRACT_ADDRESS.slice(-6)}
+          <LiveStatus health={health} failed={healthFailed} />
+          <ExternalLink href={contractUrl} className="strip-link">
+            Contract {contractAddress.slice(0, 8)}…{contractAddress.slice(-6)}
             <ArrowIcon />
           </ExternalLink>
           <ExternalLink href={GITHUB_URL} className="strip-link">
@@ -316,8 +315,8 @@ export function App() {
               <span className="step-number">2</span>
               <div className="step-icon mint">/</div>
               <h3>Run one command</h3>
-              <p>Register the server, install the starter pack, and assign the wallet that owns its rules.</p>
-              <code>/rule setup display-name admin-wallet</code>
+              <p>{health?.protocol === 2 ? "Register the server and assign its admin wallet. Every member can report without a wallet; only rule-edit delegation needs the admin’s signature." : "Register the server and install its editable starter rules."}</p>
+              <code>{health?.protocol === 2 ? "/rule setup display-name admin-wallet" : "/rule setup display-name"}</code>
             </li>
             <li>
               <span className="step-number">3</span>
@@ -354,8 +353,8 @@ export function App() {
                 <h2>Follow the live trail.</h2>
               </div>
               <p>
-                These are explorer-backed transactions from a real member report,
-                followed by the finalized GenLayer decision.
+                These historical StudioNet contract tests show an appeal changing
+                a decision. They remain available alongside current case lookup.
               </p>
             </div>
             <div className="evidence-grid">
@@ -370,7 +369,7 @@ export function App() {
                   <span className="evidence-arrow">↗</span>
                 </ExternalLink>
               ))}
-              <ExternalLink href={CONTRACT_URL} className="evidence-card contract-card">
+              <ExternalLink href={contractUrl} className="evidence-card contract-card">
                 <span className="evidence-index">04</span>
                 <div>
                   <small>STUDIONET CONTRACT</small>
@@ -403,7 +402,9 @@ export function App() {
         <Logo />
         <p>Member-driven moderation, backed by GenLayer.</p>
         <div>
-          <ExternalLink href={CONTRACT_URL}>Contract</ExternalLink>
+          <ExternalLink href={contractUrl}>Case contract</ExternalLink>
+          {health?.registryAddress && <ExternalLink href={`https://explorer-studio.genlayer.com/address/${health.registryAddress}`}>Rule registry</ExternalLink>}
+          {health?.ledgerAddress && <ExternalLink href={`https://explorer-studio.genlayer.com/address/${health.ledgerAddress}`}>Decision ledger</ExternalLink>}
           <ExternalLink href={GITHUB_URL}>GitHub</ExternalLink>
           <ExternalLink href={HEALTH_URL}>Bot status</ExternalLink>
         </div>

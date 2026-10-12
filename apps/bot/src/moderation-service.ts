@@ -34,6 +34,7 @@ import type {
 } from "./operation-store.js";
 import { RuleCache } from "./rule-cache.js";
 import { FinalizedExecutionError } from "./transaction.js";
+import { assertEvidenceText, evidenceExcerpt } from "./evidence-text.js";
 
 export interface DefaultRuleInstallResult {
   added: string[];
@@ -445,14 +446,13 @@ export class ModerationService {
       };
     }
 
-    const reason = [
+    const reason = evidenceExcerpt([
       `Community report. CommonGround selected ${selection.rule.name} from ${activeRules.length} active rules.`,
       selection.detectorReason,
       challengeReason.trim() ? `Reporter context: ${challengeReason.trim()}` : undefined,
     ]
       .filter((item): item is string => Boolean(item))
-      .join(" ")
-      .slice(0, 2_000);
+      .join(" "), 2_000);
     const opened = await this.openAndAdjudicateCase(
       message,
       selection.rule.rule_id,
@@ -541,6 +541,7 @@ export class ModerationService {
     appealReason: string,
     requester: AppealRequester,
   ): Promise<AppealResult> {
+    assertEvidenceText(appealReason, 2_000);
     const binding = await this.store.getCaseBinding(caseId);
     if (!binding || binding.guildId !== guildId) {
       throw new Error("This case does not belong to this Discord server.");
@@ -693,14 +694,16 @@ export class ModerationService {
       );
       return "The configured action was withheld because the message no longer matched the reviewed snapshot.";
     }
-    await this.#actions.execute(
+    const receipt = await this.#actions.execute(
       message,
       decided.rule_snapshot.action,
       `GenLayer finalized a violation of ${decided.rule_id} v${decided.rule_version}`,
       decided.case_id,
       decided.rule_id,
     );
-    return `The configured \`${decided.rule_snapshot.action}\` action was applied.`;
+    return receipt.outcome === "applied"
+      ? `The configured \`${decided.rule_snapshot.action}\` action was applied.`
+      : `Discord action outcome: ${receipt.outcome}. ${receipt.detail} A moderator should inspect the channel; full enforcement was not confirmed.`;
   }
 
   async resumePendingOperations(): Promise<void> {
@@ -839,6 +842,8 @@ export class ModerationService {
     const channelKey = hashDiscordIdentifier("channel", message.channelId);
     const authorKey = hashDiscordIdentifier("author", message.author.id);
     const context = await this.buildContext(message);
+    assertEvidenceText(message.content, 4_000);
+    assertEvidenceText(reason, 2_000);
     const messageHash = hashExactText(message.content);
     const caseId = moderationCaseId(guild, messageKey, ruleId, rule.version, messageHash);
     const digest = evidenceDigest([guild, ruleId, String(rule.version), messageKey, channelKey,
@@ -853,12 +858,15 @@ export class ModerationService {
     return { caseId, queued: true, duplicate: false };
   }
 
-  async caseProgress(guildId: string, caseId: string): Promise<{ stage: string; transactionHash?: string; revision: number; decision?: string }> {
+  async caseProgress(guildId: string, caseId: string): Promise<{ stage: string; transactionHash?: string; revision: number; decision?: string; defenseDeadline?: number; appealDeadline?: number }> {
     const binding = await this.store.getCaseBinding(caseId);
     if (!binding || binding.guildId !== guildId) throw new Error("This case does not belong to this Discord server.");
-    if (binding.workflow) return { stage: binding.workflow.stage, ...(binding.workflow.hash ? { transactionHash: binding.workflow.hash } : {}), revision: binding.finalizedRevision, ...(binding.finalizedDecision ? { decision: binding.finalizedDecision } : {}) };
+    if (binding.workflow && ["queued", "opening"].includes(binding.workflow.stage)) return { stage: binding.workflow.stage, ...(binding.workflow.hash ? { transactionHash: binding.workflow.hash } : {}), revision: binding.finalizedRevision, ...(binding.finalizedDecision ? { decision: binding.finalizedDecision } : {}) };
     const item = await this.getCase(guildId, caseId);
-    return { stage: item.status, revision: item.decision_revision, decision: item.decision };
+    return { stage: binding.workflow?.stage ?? item.status, revision: item.decision_revision, decision: item.decision,
+      ...(binding.workflow?.hash ? { transactionHash: binding.workflow.hash } : {}),
+      ...(item.status === "awaiting_defense" && item.defense_deadline ? { defenseDeadline: item.defense_deadline } : {}),
+      ...(item.status === "decided" && item.decision === "violation" && item.rule_snapshot.appeal_allowed && item.appeal_deadline ? { appealDeadline: item.appeal_deadline } : {}) };
   }
 
   async publicCase(caseId: string): Promise<Record<string, unknown> | null> {
@@ -907,7 +915,14 @@ export class ModerationService {
       let hash = workflow.hash;
       if (!hash) {
         const operation = await this.store.latestCaseOperation(binding.caseId, workflow.stage === "opening" ? "open_case" : "adjudicate_case");
-        if (!operation) return; // Persisted signed broadcast is reconciled first.
+        if (!operation) {
+          // A crash can occur after saving the stage but before signing. Only
+          // reset when no persisted signature could already be on the network.
+          if (!(await this.store.pendingBroadcasts()).some((entry) => entry.caseId === binding.caseId)) {
+            await save({ ...workflow, stage: workflow.stage === "opening" ? "queued" : "waiting_defense" });
+          }
+          return;
+        }
         hash = operation.transactionHash;
         workflow = { ...workflow, hash };
         await save(workflow);
@@ -917,12 +932,17 @@ export class ModerationService {
       await save({ ...workflow, stage: workflow.stage === "opening" ? "waiting_defense" : "waiting_appeal" });
     }
     const item = await this.gateway.getCase(binding.caseId);
-    if (item.status === "awaiting_context" && Math.floor(Date.now() / 1000) >= (item.context_deadline ?? Number.MAX_SAFE_INTEGER)) {
+    if (["awaiting_defense", "awaiting_context", "context_supplied"].includes(item.status)
+        && Math.floor(Date.now() / 1000) >= (item.context_deadline ?? Number.MAX_SAFE_INTEGER)) {
       const hash = await this.submitWrite("expire_case", binding.guildId, "expire_case", [binding.caseId], binding.caseId);
       await save({ ...workflow, hash, stage: "waiting_context" });
       return;
     }
     if (item.status === "awaiting_defense" || item.status === "context_supplied") {
+      if (item.status === "awaiting_defense" && !workflow.defenseAnnounced) {
+        await this.#actions.log(`**Case opened — response window**\nCase: \`${item.case_id}\`\nThe reported-message author or a server moderator can use \`/case defend\` before <t:${item.defense_deadline}:F>. Evidence is public and permanent. Review continues after this window.`, binding.channelId);
+        await save({ ...workflow, defenseAnnounced: true });
+      }
       if (Math.floor(Date.now() / 1000) <= (item.defense_deadline ?? 0)) { await save({ ...workflow, stage: "waiting_defense" }); return; }
       await save({ ...workflow, stage: "reviewing", hash: undefined });
       try {
@@ -942,6 +962,11 @@ export class ModerationService {
     if (!binding?.workflow) throw new Error("Missing durable case workflow");
     this.assertCaseGuild(item, binding.guildId);
     let workflow = binding.workflow;
+    if (item.status === "closed_unresolved" && item.decision_revision === 0) {
+      await this.#actions.log(`**Case closed without a decision**\nCase: \`${item.case_id}\`\nThe review deadline passed. No Discord penalty was authorized.`, binding.channelId);
+      await this.store.updateWorkflow(item.case_id, { ...workflow, stage: "complete" });
+      return;
+    }
     if (item.decision === "pending") return;
     if (item.decision_revision > binding.finalizedRevision) {
       const changedFromViolation = binding.finalizedDecision === "violation" && item.decision !== "violation";
@@ -951,7 +976,13 @@ export class ModerationService {
       const strikeRetracted = changedFromViolation && item.rule_snapshot.action === "delete_and_strike"
         ? await this.store.retractStrike(item.case_id)
         : false;
-      await this.#actions.log(`**Case decision**\nCase: \`${item.case_id}\`\nRevision: ${item.decision_revision}\nDecision: \`${item.decision}\`\n${item.analysis}\n${item.decision === "needs_context" ? "Use /case context to supply missing public context." : item.appeal_count ? "Appeal finalized." : "A permitted appeal can be requested before the displayed deadline."}${cleanup}${strikeRetracted ? " The recorded strike was removed." : ""}`, binding.channelId);
+      const nextStep = item.decision === "needs_context"
+        ? item.status === "closed_unresolved" ? "The case is closed without an enforceable verdict." : "Use /case context to supply missing public context."
+        : item.appeal_count ? "Appeal finalized."
+        : item.decision === "violation" && item.rule_snapshot.appeal_allowed
+          ? `The reported-message author or a moderator may use /case appeal before <t:${item.appeal_deadline}:F>. Enforcement waits for this deadline.`
+          : "No appeal is available for this decision.";
+      await this.#actions.log(`**Case decision**\nCase: \`${item.case_id}\`\nRevision: ${item.decision_revision}\nDecision: \`${item.decision}\`\n${item.analysis}\n${nextStep}${cleanup}${strikeRetracted ? " The recorded strike was removed." : ""}`, binding.channelId);
       await this.store.updateCaseFinalizedState(item.case_id, item.decision_revision, item.decision);
     }
     if (item.status === "awaiting_context") {
@@ -989,6 +1020,9 @@ export class ModerationService {
         if (!message) { outcome = "unavailable"; detail = "Source message unavailable; no deletion claimed."; }
         else if (hashExactText(message.content) !== item.message_hash) { outcome = "withheld_changed"; detail = "Message bytes changed; action withheld."; }
         else {
+          if (!await this.store.acquireLease("recovery-worker", this.#workerId, 60_000)) {
+            throw new Error("Recovery lease was lost; Discord action deferred to the active worker");
+          }
           workflow = { ...workflow, actionStarted: true, actionRevision: item.decision_revision, stage: "executing" };
           await this.store.updateWorkflow(item.case_id, workflow);
           const action = await this.#actions.execute(message, item.rule_snapshot.action, "Finalized contextual violation after appeal eligibility", item.case_id, item.rule_id);
@@ -1016,6 +1050,7 @@ export class ModerationService {
   }
 
   async defendCase(guildId: string, caseId: string, reason: string, requester: AppealRequester): Promise<string> {
+    assertEvidenceText(reason, 2_000);
     const binding = await this.store.getCaseBinding(caseId);
     if (!binding || binding.guildId !== guildId || (binding.authorId !== requester.userId && !requester.canModerate)) throw new Error("Only the reported author or a server moderator can supply evidence.");
     const item = await this.getCase(guildId, caseId);
@@ -1090,7 +1125,7 @@ export class ModerationService {
       : [];
     context.push(...before.map((item) => line("before", item)));
     context.push(...after.map((item) => line("after", item)));
-    return context.join("\n").slice(0, 8_000);
+    return evidenceExcerpt(context.join("\n"), 8_000);
   }
 
   private caseId(message: Message, ruleId: string, version = 1): string {

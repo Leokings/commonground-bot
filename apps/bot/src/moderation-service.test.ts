@@ -422,6 +422,29 @@ describe("appeal authorization and finalized revision recovery", () => {
       expect.objectContaining({ content: expect.stringMatching(/Appeal revised.*violation/is) }),
     );
   });
+
+  it("does not claim a rejected Discord action succeeded on the legacy finalization path", async () => {
+    const gateway = new RecordingGateway();
+    gateway.caseResponses = [
+      finalizedCase({ guildId: "guild-1", decision: "allowed", revision: 1 }),
+      finalizedCase({ guildId: "guild-1", previousDecision: "allowed", decision: "violation", revision: 2 }),
+    ];
+    const store = new MemoryOperationStore();
+    await seedBinding(store, { finalizedRevision: 1, finalizedDecision: "allowed" });
+    const send = vi.fn(async () => undefined);
+    const message = { content: "You are fucking stupid.", deletable: false,
+      guildId: "guild-1", channelId: "channel-1", author: { id: "author-1" } } as unknown as Message;
+    const client = { channels: { fetch: async () => ({ isTextBased: () => true,
+      messages: { fetch: async () => message }, send }) }} as unknown as Client;
+    await new ModerationService(client, config, gateway, store).appealCase(
+      "guild-1", "case-appeal-1", "Public context", { userId: "moderator", canModerate: true },
+    );
+    const announcement = send.mock.calls.map(([body]) => (body as { content: string }).content)
+      .find((content) => content.includes("Appeal revised"));
+    expect(announcement).toContain("Discord action outcome: failed");
+    expect(announcement).not.toContain("action was applied");
+    expect(await store.retractStrike("case-appeal-1")).toBe(false);
+  });
 });
 
 describe("member-driven reports", () => {

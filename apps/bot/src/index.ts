@@ -1,6 +1,6 @@
-import { Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
+import { Client, Events, GatewayIntentBits, MessageFlags, REST, Routes } from "discord.js";
 
-import { handleInteraction } from "./commands.js";
+import { commandDefinitions, handleInteraction } from "./commands.js";
 import { loadConfig } from "./config.js";
 import { createContractGateway } from "./contract-gateway.js";
 import { loadEnvironment } from "./environment.js";
@@ -11,6 +11,12 @@ import { createOperationStore } from "./operation-store.js";
 
 loadEnvironment();
 const config = loadConfig();
+const discordRest = new REST({ version: "10" }).setToken(config.discordToken);
+await discordRest.put(Routes.applicationCommands(config.discordClientId), { body: commandDefinitions });
+if (config.discordTestGuildId) {
+  await discordRest.put(Routes.applicationGuildCommands(config.discordClientId, config.discordTestGuildId), { body: commandDefinitions });
+}
+logger.info({ commands: commandDefinitions.length }, "Discord commands registered for this release");
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
