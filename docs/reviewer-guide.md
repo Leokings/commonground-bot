@@ -5,13 +5,17 @@
 - App: <https://commonground-bot.vercel.app>
 - Discord install: <https://discord.com/oauth2/authorize?client_id=1552600187556462652&permissions=76800&integration_type=0&scope=bot%20applications.commands>
 - Source: <https://github.com/Leokings/commonground-bot>
-- Intelligent Contract: <https://explorer-studio.genlayer.com/address/0x01858Aad8C071fE3677588C6d3b107da47d879C8>
+- CaseCourt: <https://explorer-studio.genlayer.com/address/0x461ea2fbA9339F099c38eF4A0c910011EAcC8483>
+- CommunityRegistry: <https://explorer-studio.genlayer.com/address/0x58D98ffb1f181B5ea93EC3E7afbc7941834f96AD>
+- EnforcementLedger: <https://explorer-studio.genlayer.com/address/0x6bA7eD094Cc2Bd035BDb8996b7D7D6C9bC7AACb9>
 - Hosted bot health: <https://p01--commonground-bot--2tgdv5n7tzkj.code.run/health>
 
 ## First-time test
 
 1. Add CommonGround to a Discord server where you can manage the server.
-2. In a public text channel, run `/rule setup` and provide a display name. This
+2. In a public text channel, run `/rule setup` and provide a display name plus
+   an `admin-wallet` public 0x address. Use a browser or CLI wallet you control;
+   never enter a private key. This
    registers the server and installs the six-rule editable starter pack. The
    writes finalize one at a time, so initial setup can take several minutes.
 3. Send a harmless context message, then send a second message as a reply. For
@@ -20,16 +24,41 @@
 4. As any server member, reply to the second message with
    `@CommonGround report`.
 5. The bot selects the relevant rule automatically. No reporter needs a rule ID.
-6. For contextual language, the bot returns a case ID and GenLayer transaction
-   hash, waits for finalization, and posts the final decision in the originating
-   server.
-7. The reported-message author or a server moderator can run `/case appeal`.
-   The command waits for revision 2 and announces whether the decision changed.
+6. For contextual language, the bot returns a queued case ID. Once it opens
+   on-chain, the author or a moderator can use `/case defend` before the announced
+   two-minute deadline. `/case status` shows progress. After review, paste the same
+   ID into the website's public case lookup and compare the decision revision.
+7. A violation under an appealable rule waits five minutes before enforcement.
+   Only the reported author or a moderator can use `/case appeal` before that
+   deadline. An allowed case receives no penalty. Missing-context responses use
+   `/case context` and do not consume the appeal.
+
+Optional customization: the admin wallet can grant the bot rule-edit permission
+for up to seven days using the website. With a CLI-owned admin wallet, select its
+CLI account and call the registry's `set_roles` with the guild key, bot relayer
+address, policy editor address and an expiry. To revoke editing while preserving
+reports, keep the bot as case relayer, set the editor to the zero address and set
+expiry to 0. See the deployment manifest for this test server's public addresses.
+
+The admin wallet belongs to one server's rule settings. Other server owners
+choose their own wallet; members need only Discord. The bot attests Discord
+identity and evidence authenticity; hashes prove byte integrity, not authenticity.
 
 CommonGround ignores ordinary messages. It checks only a message that a member
 reports. Reports from private channels and private threads are rejected.
 
-## Current appeal and recovery evidence
+## Current v2 evidence
+
+The [live verification record](live-verification.md) documents the real Discord
+report, finalized allowed revision, separate decision/action ledger readback,
+restart recovery, API checks, and intentional wrong-hash rejection. The
+[deployment manifest](../deployments/studionet-v2.json) pins the public addresses,
+source hashes and image; [CI](https://github.com/Leokings/commonground-bot/actions/runs/38235463982)
+passed 25 direct, 9 core and 79 bot tests plus eight real PostgreSQL checks.
+V2 appeal/defense branches were regression-tested locally; do not interpret the
+historical v1 appeal below as a new v2 network appeal.
+
+## Historical v1 appeal and recovery evidence
 
 - Repaired contract deployment: <https://explorer-studio.genlayer.com/tx/0x00054cbbc97eced2172550d92eada348ead2d88a4c1be49896b855ab37b66b93>
 - Changed-decision case opened: <https://explorer-studio.genlayer.com/tx/0xf43ef19fc38b14911db3e3b144c713fbdaa9c47fa49c9cdce9259e7cbfabb5f9>

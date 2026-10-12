@@ -1,13 +1,78 @@
 # Live verification
 
-CommonGround is deployed to the GenLayer Studio Network at
+## Current v2 verification — 12 October 2026
+
+The live bot uses three cooperating StudioNet contracts. Their addresses,
+deployment transactions and exact source SHA-256 hashes are in the
+[deployment manifest](../deployments/studionet-v2.json). Source readback matched
+both the local files and the committed Git blobs. Registry, court and ledger
+deployment, court-to-ledger binding, and test-server registration all finalized
+with successful execution. Public health reports protocol 2, the same addresses,
+`ready: true` and release `885740d4627730e36ff78bac05252090c78df469`.
+
+### Real Discord case and restart recovery
+
+- In `#testing-channel`, a public non-targeted praise/emphasis message was
+  explicitly reported through **Apps → Common ground → Review with CommonGround**
+  and the public-evidence confirmation was accepted. Seven active rules were
+  checked; the contextual profanity rule was selected.
+- Case ID: `case-1ce6d82f6fce21a78a611aa2a2a126cb6cac8afdaceec7ec6ec9f88f5d7eb722`.
+- [Open transaction](https://explorer-studio.genlayer.com/tx/0xc79218ea8736422b0a492074b6875ac853a21839a59b71bf395927b8affa1e35).
+- A fresh `/case status` command returned `complete`, `allowed`, revision 1,
+  and [the latest workflow transaction](https://explorer-studio.genlayer.com/tx/0x906fc6e08d9eb6e320ab35e44561384609c063a381b34c2b3eb18446a44d9619).
+- The actual StudioNet receipt exposed idle/cancelled validator entries in its
+  leader receipt array. After fixing the parser and restarting the hosted bot,
+  **the same persisted case** resumed, announced its defense deadline, reached
+  `allowed` revision 1, and posted the final decision in Discord. The original
+  message remained visible with no penalty. This was real network execution,
+  not a mocked LLM result.
+- `EnforcementLedger.get_decision(caseId, 1)` returned an initial `allowed`
+  decision from the deployed CaseCourt. Receipt ID:
+  `56c1e263504c093e2583d46c41683c99631dfecf11751a2f392883b198ef36ad`.
+- `EnforcementLedger.get_enforcement(caseId, 1)` returned `no_action`, the
+  configured bot executor, and provenance `executor_reported_not_discord_proof`.
+  This is a bot-reported outcome, not an independent Discord attestation.
+- [Public finalized case readback](https://p01--commonground-bot--2tgdv5n7tzkj.code.run/api/cases/case-1ce6d82f6fce21a78a611aa2a2a126cb6cac8afdaceec7ec6ec9f88f5d7eb722)
+  agreed on the allowed revision and `no_action` receipt.
+
+### Intentional integrity rejection
+
+[This wrong-hash transaction](https://explorer-studio.genlayer.com/tx/0x0eb60ef08f8b1ced871daafeb61daed4446ecb51f859b6ce7f7e44fe18316dd3)
+finalized with the **expected execution failure** `[EXPECTED] Message hash mismatch`.
+The original case's evidence digest, exact message hash and revision remained
+unchanged. This tests rejection of tampered input, not a successful case opening.
+
+### Website, API and CI
+
+- Website: live deployment status, three contract links, invalid case-ID
+  validation, real case lookup, example switching and animation pause/play checked.
+  Wallet-only rule editing remains disabled without a connected owner wallet.
+- API: health and existing case returned 200; a valid nonexistent case returned
+  404 `case_not_found`; an invalid path returned 404 `not_found`; POST to a case
+  returned 405 `method_not_allowed`. Public responses contain no signing secrets.
+- [Passing CI for the deployed bot](https://github.com/Leokings/commonground-bot/actions/runs/38235463982):
+  four contract lint checks, 25 direct contract tests, 9 core tests, 79 bot tests,
+  TypeScript checking, production build, eight real PostgreSQL smoke checks, and
+  image publication. Production dependency audit found zero vulnerabilities.
+
+The v2 live case proves the allowed path and recovery across a real restart. It
+does **not** prove every branch on StudioNet. V2 defense submission, violation
+appeal, missing-context and enforcement failure branches are covered by local
+regressions; the live appeal and deletion receipts below are explicitly historical
+v1 evidence. Browser-wallet signing was not exercised in this run; the separate
+admin's rule-edit grant was signed using its existing CLI wallet. Public evidence
+is permanent, and the bot remains the trusted bridge for Discord identity/content.
+
+## Historical v1 verification
+
+The following section concerns the preceding deployment at
 [`0x01858Aad8C071fE3677588C6d3b107da47d879C8`](https://explorer-studio.genlayer.com/address/0x01858Aad8C071fE3677588C6d3b107da47d879C8).
 
 Every successful transaction below reached `FINALIZED`; the explorer displays
 the consensus result as `Accepted` and the GenVM execution result as `SUCCESS`.
 The one intentionally rejected transaction is identified separately.
 
-## Appeal-authorization remediation
+### Appeal-authorization remediation
 
 1. [Deploy the repaired Intelligent Contract](https://explorer-studio.genlayer.com/tx/0x00054cbbc97eced2172550d92eada348ead2d88a4c1be49896b855ab37b66b93)
 2. [Register the live Discord server](https://explorer-studio.genlayer.com/tx/0x842303af7fb352a2cd409b62ab9c84cb785b4648b915a3f6a805b999162476de)
@@ -137,9 +202,9 @@ live Discord guild and its live contextual case are documented below.
 The repository verification command covers GenVM linting, direct contract
 execution, shared moderation logic, Discord commands, and the production build:
 
-- 10 direct intelligent-contract tests
+- 25 direct intelligent-contract tests
 - 9 shared core tests
-- 43 Discord-bot tests
+- 79 Discord-bot tests
 - TypeScript type-check and production build
 
 Run `npm run verify` from the repository root. The context regression explicitly

@@ -19,6 +19,23 @@
     "deploy_court": "0xf7a0c4727736563a70a7af0fd1177d7da9451a0f545fef0d9c385bbbd6688a60",
     "deploy_ledger": "0xd1217e8539d9bc139f424df1afe3b5c2fe68fd3e2a73a1d43289e57aa33f2481",
     "bind_court": "0xc19244b9372a6c2e8df7a7e9bf6b1b71b2a18d8670e83a4c1052447a9b6a14a8",
-    "register_test_guild": "0x9f0aebe3ffebb4756030a6b0e4f84f6f215502fce8460eaa39cba129cace361e"
-  }
+    "register_test_guild": "0x9f0aebe3ffebb4756030a6b0e4f84f6f215502fce8460eaa39cba129cace361e",
+    "grant_one_day_rule_editing": "0x86271fb7f896ebbef502870f7da354727523b82ed85011a72edc5a68128b99ce",
+    "preserve_custom_link_rule": "0x8ce8d0b81e93f3e66858ce19f5d88861e95d84c1d2f3a4814d10731b4949d9c2",
+    "live_discord_case_open": "0xc79218ea8736422b0a492074b6875ac853a21839a59b71bf395927b8affa1e35",
+    "live_case_latest_workflow": "0x906fc6e08d9eb6e320ab35e44561384609c063a381b34c2b3eb18446a44d9619",
+    "rejected_wrong_hash": "0x0eb60ef08f8b1ced871daafeb61daed4446ecb51f859b6ce7f7e44fe18316dd3"
+  },
+  "live_case_id": "case-1ce6d82f6fce21a78a611aa2a2a126cb6cac8afdaceec7ec6ec9f88f5d7eb722",
+  "live_case_result": {
+    "decision": "allowed",
+    "revision": 1,
+    "decision_receipt_id": "56c1e263504c093e2583d46c41683c99631dfecf11751a2f392883b198ef36ad",
+    "executor_outcome": "no_action",
+    "executor_provenance": "executor_reported_not_discord_proof",
+    "recovered_after_restart": true,
+    "wrong_hash_rejected_without_case_mutation": true
+  },
+  "verified_bot_image": "ghcr.io/leokings/commonground-bot:885740d4627730e36ff78bac05252090c78df469",
+  "ci_run": "https://github.com/Leokings/commonground-bot/actions/runs/38235463982"
 }

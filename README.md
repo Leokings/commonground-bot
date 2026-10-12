@@ -21,7 +21,10 @@ The first working milestone now includes:
 
 ## Live Studio Network deployment
 
-- Contract: `0x01858Aad8C071fE3677588C6d3b107da47d879C8`
+- CommunityRegistry: `0x58D98ffb1f181B5ea93EC3E7afbc7941834f96AD`
+- CaseCourt: `0x461ea2fbA9339F099c38eF4A0c910011EAcC8483`
+- EnforcementLedger: `0x6bA7eD094Cc2Bd035BDb8996b7D7D6C9bC7AACb9`
+- Historical v1 contract: `0x01858Aad8C071fE3677588C6d3b107da47d879C8`
 - Public app: <https://commonground-bot.vercel.app>
 - Install in Discord: <https://discord.com/oauth2/authorize?client_id=1552600187556462652&permissions=76800&integration_type=0&scope=bot%20applications.commands>
 - Hosted bot health: <https://p01--commonground-bot--2tgdv5n7tzkj.code.run/health>
@@ -35,7 +38,7 @@ walkthrough, a context-routing demo, and direct explorer evidence. See
 
 ## Architecture v2 rollout
 
-The current release work adds three purpose-separated contracts: `CommunityRegistry`
+The v2 release uses three purpose-separated contracts: `CommunityRegistry`
 for per-server rule versions and wallet permissions, `CaseCourt` for exact-hash,
 defense-aware contextual decisions, and `EnforcementLedger` for finalized
 decision history plus explicitly executor-reported Discord outcomes. The bot
@@ -43,10 +46,14 @@ keeps Discord identity checks, durable workflow recovery, and execution; the
 GenLayer contracts do not claim proof that a Discord message is authentic or
 that an executor really performed an action.
 
-V2 is not considered live until the hosted health endpoint reports protocol 2
-and the registry and ledger addresses. The existing StudioNet contract and its
-historical evidence remain unchanged. Do not treat v2 source or local tests as
-proof of a live deployment. See [`docs/architecture-v2.md`](docs/architecture-v2.md).
+The hosted health endpoint reports protocol 2 and the three verified deployment
+addresses. V2 adds a two-minute defense window, bounded missing-context responses,
+and a five-minute appeal window for eligible violations before enforcement.
+Each server assigns its own admin wallet; members report and appeal through
+Discord without a wallet. Historical v1 cases remain readable. See
+[`docs/architecture-v2.md`](docs/architecture-v2.md), the exact
+[`deployment manifest`](deployments/studionet-v2.json), and the
+[`12 October audit`](docs/audit-2026-10-12.md).
 
 See [`docs/architecture.md`](docs/architecture.md) for the trust boundary and
 end-to-end flow.
@@ -88,7 +95,11 @@ a Docker deployment, and optional PostgreSQL-backed restart recovery. See
 
 ## Discord commands
 
-- `/rule setup` registers the server and installs the editable starter rules.
+- `/rule setup display-name:<name> admin-wallet:<public-address>` registers the
+  server and installs the editable starter rules. The wallet controls that
+  server's rule settings; it does not restrict who can report messages.
+- Rule edits by the bot need a revocable, time-limited grant from that admin
+  wallet. Starter rules work immediately without this optional editing grant.
 - `/rule install-defaults` installs missing defaults; `replace-existing:true`
   creates new on-chain versions of existing starter rules.
 - `/rule add-rule` creates a versioned rule.
@@ -96,10 +107,12 @@ a Docker deployment, and optional PostgreSQL-backed restart recovery. See
 - `/rule list` reads the finalized active rules.
 - `/rule disable-rule` disables an active rule.
 - `/case status` reads cases only from the current server. `/case appeal` is
-  available only to the reported-message author or a server moderator.
+  available only to the reported-message author or a server moderator, for an
+  eligible violation before its deadline. `/case defend` accepts an initial
+  defense; `/case context` supplies missing context without consuming the appeal.
 - Reply to a message with `@CommonGround report` for the simplest member flow.
 - `/report message-link:<link>` reports a copied Discord message link.
-- `Apps → Report to CommonGround` is an alternative one-click message action.
+- `Apps → Common ground → Review with CommonGround` is an alternative message action.
 
 All three report paths choose the relevant active rule automatically. Ordinary,
 unreported messages are ignored and produce no GenLayer transaction.

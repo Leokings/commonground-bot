@@ -20,13 +20,15 @@ export default async function rollout(cliClient) {
     return value;
   };
   const read = (target, method, args = []) => client.readContract({ address: address(target), functionName: method, args, transactionHashVariant: "latest-final", jsonSafeReturn: true });
-  async function finalized(hash) {
+  async function finalized(hash, expectedHashRejection = false) {
     console.log(JSON.stringify({ submitted: hash, signer }));
     const receipt = await client.waitForTransactionReceipt({ hash, status: "FINALIZED", interval: 3_000, retries: 150 });
     const execution = inspectReceiptExecution(receipt);
     const target = receipt.data?.contract_address ?? receipt.txDataDecoded?.contractAddress ?? receipt.to_address ?? receipt.recipient;
     console.log(JSON.stringify({ hash, status: receipt.status, execution, address: target }));
-    if (execution.outcome !== "success") throw new Error(`Execution was not successful: ${hash}`);
+    if (expectedHashRejection
+      ? execution.outcome !== "failure" || execution.detail !== "[EXPECTED] Message hash mismatch"
+      : execution.outcome !== "success") throw new Error(`Unexpected execution outcome: ${hash}`);
     return { receipt, target };
   }
   const write = async (target, method, args) => finalized(await client.writeContract({ address: address(target), functionName: method, args, value: 0n }));
@@ -71,6 +73,18 @@ export default async function rollout(cliClient) {
     const guild = hashDiscordIdentifier("guild", guildId);
     await write(registry, "set_roles", [guild, contractAddressArgument(relayer), contractAddressArgument(relayer), Math.floor(Date.now() / 1000) + 86400]);
     console.log(JSON.stringify({ guild: await read(registry, "get_guild", [guild]) }));
+  } else if (action === "reject-hash") {
+    const [court, caseId] = parameters;
+    const before = await read(court, "get_case", [caseId]);
+    const hash = await client.writeContract({ address: address(court), functionName: "open_case", value: 0n,
+      args: [caseId, before.guild_key, before.rule_id, before.rule_version, `sha256:${"0".repeat(64)}`,
+        before.message_text, before.context, before.challenge_reason, before.evidence_digest,
+        before.message_key, before.channel_key, before.author_key] });
+    await finalized(hash, true);
+    const after = await read(court, "get_case", [caseId]);
+    if (after.evidence_digest !== before.evidence_digest || after.message_hash !== before.message_hash
+        || after.decision_revision !== before.decision_revision) throw new Error("Rejected evidence changed the original case");
+    console.log(JSON.stringify({ rejectedHash: true, originalCaseUnchanged: true, hash, caseId }));
   } else if (action === "migrate-rule") {
     const [registry, legacy, guildId, ruleId] = parameters;
     const guild = hashDiscordIdentifier("guild", guildId);
@@ -78,5 +92,5 @@ export default async function rollout(cliClient) {
     await write(registry, "add_rule", [guild, rule.rule_id, rule.name, rule.text, rule.mode,
       rule.detector_json, rule.exceptions_json, rule.scope_json, rule.action, rule.appeal_allowed]);
     console.log(JSON.stringify({ migratedRule: await read(registry, "get_rule", [guild, ruleId, 0]) }));
-  } else throw new Error("Set CG_ACTION to deploy, bind, register, open, roles, or migrate-rule, with explicit CG_ARGS");
+  } else throw new Error("Set CG_ACTION to deploy, bind, register, open, roles, migrate-rule, or reject-hash, with explicit CG_ARGS");
 }

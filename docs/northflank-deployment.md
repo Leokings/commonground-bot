@@ -8,7 +8,7 @@ connection remains the moderation transport.
 
 - Public health URL: <https://p01--commonground-bot--2tgdv5n7tzkj.code.run/health>
 - GitHub repository: <https://github.com/Leokings/commonground-bot>
-- Container image: `ghcr.io/leokings/commonground-bot:latest`
+- Container image: `ghcr.io/leokings/commonground-bot:885740d4627730e36ff78bac05252090c78df469`
 - Northflank project: `plain3rd`
 - Service: `commonground-bot`
 - PostgreSQL addon: `commonground-db`
@@ -60,12 +60,18 @@ Configure these as Northflank secrets rather than committing them:
 - `GENLAYER_PRIVATE_KEY`
 - `GENLAYER_NETWORK=studionet`
 - `GENLAYER_CONTRACT_ADDRESS`
+- `GENLAYER_REGISTRY_ADDRESS` and `GENLAYER_LEDGER_ADDRESS` for protocol v2
 - `DATABASE_URL` from the project PostgreSQL addon
 - `PORT=8080`
 
 The database makes submitted transaction recovery and Discord case bindings
 survive container restarts. The GenLayer contract remains the canonical store
 for rules and finalized decisions.
+
+The production image is pinned to a verified commit. Both global commands and
+stale test-guild overrides are synchronized on startup so context-menu actions
+are not listed twice. `/health` exposes protocol, public companion addresses and
+release only; `/api/cases/<case-id>` returns bounded public decision metadata.
 
 The hosted bot is report-driven. It ignores every ordinary message and starts a
 check only after a member explicitly reports a message. `AUTO_SUBMIT_HYBRID` is
